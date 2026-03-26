@@ -6,36 +6,130 @@ class IntentMatcher {
         this.intentEmbeddings = []; // Array of { intentName, text, embedding }
     }
 
-    async reload() {
+    async reload(options = {}) {
         console.log('[IntentMatcher] Reloading intents and regenerating embeddings...');
         const rawData = await dataLoader.loadIntents();
+        
+        let processedData = rawData;
+
+        // NEW: Apply Pruning if requested
+        if (options.prune) {
+            const threshold = typeof options.prune === 'number' ? options.prune : 0.15;
+            console.log(`[IntentMatcher] ✂️  Automatic Pruning active (threshold: ${threshold})`);
+            processedData = await this.pruneIntents(rawData, threshold);
+        }
+
         const allVariations = [];
         const intentNames = [];
 
-        for (const [intentName, variations] of Object.entries(rawData)) {
+        for (const [intentName, variations] of Object.entries(processedData)) {
             for (const text of variations) {
                 allVariations.push(text);
                 intentNames.push(intentName);
             }
         }
 
-        if (allVariations.length === 0) {
+        const total = allVariations.length;
+        if (total === 0) {
             console.warn('[IntentMatcher] No variations found to embed.');
             return;
         }
 
-        console.log(`[IntentMatcher] Generating embeddings for ${allVariations.length} variations...`);
+        console.log(`[IntentMatcher] Generating embeddings for ${total} variations...`);
         const startTime = Date.now();
-        const embeddings = await embeddingService.getEmbeddings(allVariations);
+        const BATCH_SIZE = 50;
+        const allEmbeddings = [];
+
+        for (let i = 0; i < total; i += BATCH_SIZE) {
+            const chunk = allVariations.slice(i, i + BATCH_SIZE);
+            const chunkEmbeddings = await embeddingService.getEmbeddings(chunk);
+            allEmbeddings.push(...chunkEmbeddings);
+
+            if (i % (BATCH_SIZE * 5) === 0 || i + BATCH_SIZE >= total) {
+                const progress = Math.min(100, ((i + chunk.length) / total * 100)).toFixed(1);
+                console.log(`[IntentMatcher] Progress: ${i + chunk.length}/${total} variations (${progress}%)`);
+            }
+
+            // Yield to event loop to allow signal handling
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
         const duration = Date.now() - startTime;
 
         this.intentEmbeddings = allVariations.map((text, i) => ({
             intentName: intentNames[i],
             text,
-            embedding: embeddings[i]
+            embedding: allEmbeddings[i]
         }));
 
         console.log(`[IntentMatcher] Generated ${this.intentEmbeddings.length} embeddings in ${duration}ms.`);
+    }
+
+    /**
+     * Internal pruning protocol using Cosine Distance
+     */
+    async pruneIntents(intentData, threshold) {
+        const prunedData = {};
+        const stats = { total: 0, kept: 0 };
+
+        for (const [intentName, variations] of Object.entries(intentData)) {
+            if (variations.length <= 1) {
+                prunedData[intentName] = variations;
+                stats.total += variations.length;
+                stats.kept += variations.length;
+                continue;
+            }
+
+            // Shuffle variations so prototypes are random
+            const shuffled = [...variations];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            // Get embeddings for this intent group
+            const embeddings = await embeddingService.getEmbeddings(shuffled);
+            const keptVariations = [];
+            const keptEmbeddings = [];
+
+            for (let i = 0; i < shuffled.length; i++) {
+                let minDistance = Infinity;
+
+                for (const keptEmb of keptEmbeddings) {
+                    const dist = this.cosineDistance(embeddings[i], keptEmb);
+                    if (dist < minDistance) minDistance = dist;
+                }
+
+                if (minDistance >= threshold) {
+                    keptVariations.push(shuffled[i]);
+                    keptEmbeddings.push(embeddings[i]);
+                }
+            }
+
+            prunedData[intentName] = keptVariations;
+            stats.total += variations.length;
+            stats.kept += keptVariations.length;
+            
+            const reduction = (((variations.length - keptVariations.length) / variations.length) * 100).toFixed(0);
+            if (reduction > 0) {
+                console.log(`[Pruner] ${intentName}: ${variations.length} -> ${keptVariations.length} (-${reduction}%)`);
+            }
+        }
+
+        console.log(`[IntentMatcher] Summary: ${stats.total} total -> ${stats.kept} pruned variations (-${(((stats.total - stats.kept) / stats.total) * 100).toFixed(1)}%)`);
+        return prunedData;
+    }
+
+    /**
+     * Calculates cosine distance between two vectors.
+     * Normalized vectors: distance = 1 - dotProduct
+     */
+    cosineDistance(vecA, vecB) {
+        let dotProduct = 0;
+        for (let i = 0; i < vecA.length; i++) {
+            dotProduct += vecA[i] * vecB[i];
+        }
+        return 1 - dotProduct;
     }
 
     /**

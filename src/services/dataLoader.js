@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import tokenDemasker from './tokenDemasker.js';
 
 class DataLoader {
     constructor() {
@@ -54,8 +55,26 @@ class DataLoader {
                 }
             }
         }
+        
+        // 1. Fetch Dynamic Context from be3_ai
+        let dynamicContext = {};
+        try {
+            const entities = await this.loadEntities();
+            dynamicContext = {
+                vendors: entities.vendor.map(v => v.label),
+                categories: entities.category.map(c => c.label),
+                // Flatten all possible attribute values into one pool for [attributes]
+                attributes: [
+                    ...Object.values(entities.attribute).flat(),
+                    ...Object.values(entities.clause).flat()
+                ]
+            };
+        } catch (err) {
+            console.warn('[DataLoader] Could not load dynamic context for de-masking:', err.message);
+        }
 
-        return intentData;
+        // 2. Apply De-masking Layer with context
+        return tokenDemasker.demaskVariations(intentData, dynamicContext);
     }
 
     /**

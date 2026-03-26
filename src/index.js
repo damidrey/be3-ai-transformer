@@ -4,6 +4,7 @@ import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import intentMatcher from './services/intentMatcher.js';
 import entityExtractor from './services/entityExtractor.js';
+import embeddingService from './services/embeddingService.js';
 
 dotenv.config();
 
@@ -91,33 +92,76 @@ app.post('/extract', async (req, res) => {
  * Returns a single structured response for the pipeline to consume early.
  */
 app.post('/analyze', async (req, res) => {
-    const { text } = req.body;
+    const { text, texts } = req.body;
+    const inputTexts = texts || (text ? [text] : null);
 
-    if (!text) {
-        return res.status(400).json({ error: 'Text field is required' });
+    if (!inputTexts || !Array.isArray(inputTexts)) {
+        return res.status(400).json({ error: 'Text or texts (array) field is required' });
     }
 
     try {
-        console.log(`[API] Analyzing: "${text}"`);
         const startTime = Date.now();
+        console.log(`[API] Analyzing ${inputTexts.length} statements...`);
 
-        // Run classification and entity extraction in parallel
-        const [classificationResults, extractionResults] = await Promise.all([
-            intentMatcher.match(text),
-            entityExtractor.extract(text)
-        ]);
+        const results = await Promise.all(inputTexts.map(async (t) => {
+            const [classificationResults, extractionResults] = await Promise.all([
+                intentMatcher.match(t),
+                entityExtractor.extract(t)
+            ]);
+            return {
+                text: t,
+                classification: classificationResults,
+                entities: extractionResults.entities,
+                confidence: extractionResults.confidence
+            };
+        }));
 
         const duration = Date.now() - startTime;
 
         res.json({
-            text,
-            classification: classificationResults,
-            entities: extractionResults.entities,
-            confidence: extractionResults.confidence,
+            results,
             duration: `${duration}ms`
         });
     } catch (err) {
         console.error('[API] Analysis error:', err);
+        res.status(500).json({ error: 'Internal server error', details: err.message });
+    }
+});
+
+/**
+ * Endpoint: Generate Embeddings
+ * POST /embed
+ * Body: { "text": "laptops" } OR { "texts": ["laptop", "phone"] }
+ */
+app.post('/embed', async (req, res) => {
+    const { text, texts } = req.body;
+    const input = texts || text;
+
+    if (!input) {
+        return res.status(400).json({ error: 'Text or texts field is required' });
+    }
+
+    try {
+        const isBatch = Array.isArray(input);
+        if (isBatch) {
+            input.forEach(text => console.log(`[API] Batch Embedding: "${text}"`));
+        } else {
+            console.log(`[API] Embedding: "${input}"`);
+        }
+        
+        const startTime = Date.now();
+        const embeddings = await embeddingService.getEmbeddings(input);
+        const duration = Date.now() - startTime;
+
+        res.json({
+            text: isBatch ? undefined : input,
+            texts: isBatch ? input : undefined,
+            embeddings,
+            dimensions: embeddings[0]?.length || 0,
+            duration: `${duration}ms`
+        });
+    } catch (err) {
+        console.error('[API] Embedding error:', err);
         res.status(500).json({ error: 'Internal server error', details: err.message });
     }
 });
@@ -150,16 +194,65 @@ app.post('/reload', async (req, res) => {
     }
 });
 
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
     console.log(`🚀 [be3-ai-transformer] Service running on http://localhost:${PORT}`);
+
+    // Parse command line arguments
+    const args = process.argv.slice(2);
+    const pruneEnabled = args.includes('--prune');
+    const pruneThreshold = args.find(a => a.startsWith('--threshold='))?.split('=')[1] || 0.15;
 
     // Warm up the model and load data on startup
     try {
         await Promise.all([
-            intentMatcher.reload(),
+            intentMatcher.reload({ prune: pruneEnabled ? parseFloat(pruneThreshold) : false }),
             entityExtractor.reload()
         ]);
     } catch (err) {
         console.error('❌ Failed to load knowledge base during startup:', err.message);
     }
+
+    // Set up periodic auto-reload (every 30 minutes) to keep de-masking context fresh
+    const RELOAD_INTERVAL = 30 * 60 * 1000; 
+    setInterval(async () => {
+        console.log(`\n[Auto-Reload] 🔄 Triggering periodic knowledge base update...`);
+        try {
+            await Promise.all([
+                intentMatcher.reload({ prune: pruneEnabled ? parseFloat(pruneThreshold) : false }),
+                entityExtractor.reload()
+            ]);
+            console.log(`[Auto-Reload] ✅ Update complete. Next update in 30 minutes.`);
+        } catch (err) {
+            console.error('[Auto-Reload] ❌ Failed to auto-reload:', err.message);
+        }
+    }, RELOAD_INTERVAL);
 });
+
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`\n❌ [ERROR] Port ${PORT} is already in use!`);
+        console.error(`This usually means another instance of the transformer server is already running in the background.`);
+        console.error(`Please kill the existing process or use a different port.\n`);
+        process.exit(1);
+    } else {
+        console.error('\n❌ [ERROR] Server encountered an error:', err);
+    }
+});
+
+// --- Graceful Shutdown Handlers ---
+const handleShutdown = (signal) => {
+    console.log(`\n[Server] Received ${signal}. Shutting down gracefully...`);
+    server.close(() => {
+        console.log('[Server] HTTP server closed.');
+        process.exit(0);
+    });
+
+    // Force exit after 5s if server.close() hangs
+    setTimeout(() => {
+        console.error('[Server] Could not close connections in time, forceful exit.');
+        process.exit(1);
+    }, 5000);
+};
+
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));

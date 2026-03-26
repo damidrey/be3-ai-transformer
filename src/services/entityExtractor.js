@@ -50,19 +50,36 @@ class EntityExtractor {
             });
         }
 
-        if (variationsToEmbed.length === 0) {
+        const total = variationsToEmbed.length;
+        if (total === 0) {
             console.warn('[EntityExtractor] No entities found to embed.');
             return;
         }
 
-        console.log(`[EntityExtractor] Generating embeddings for ${variationsToEmbed.length} entity variations...`);
+        console.log(`[EntityExtractor] Generating embeddings for ${total} entity variations...`);
         const startTime = Date.now();
-        const embeddings = await embeddingService.getEmbeddings(variationsToEmbed);
+        const BATCH_SIZE = 50;
+        const allEmbeddings = [];
+
+        for (let i = 0; i < total; i += BATCH_SIZE) {
+            const chunk = variationsToEmbed.slice(i, i + BATCH_SIZE);
+            const chunkEmbeddings = await embeddingService.getEmbeddings(chunk);
+            allEmbeddings.push(...chunkEmbeddings);
+
+            if (i % (BATCH_SIZE * 5) === 0 || i + BATCH_SIZE >= total) {
+                const progress = Math.min(100, ((i + chunk.length) / total * 100)).toFixed(1);
+                console.log(`[EntityExtractor] Progress: ${i + chunk.length}/${total} entities (${progress}%)`);
+            }
+
+            // Yield to event loop
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
         const duration = Date.now() - startTime;
 
         this.entityEmbeddings = variationsToEmbed.map((text, i) => ({
             ...metadata[i],
-            embedding: embeddings[i]
+            embedding: allEmbeddings[i]
         }));
 
         console.log(`[EntityExtractor] Generated ${this.entityEmbeddings.length} entity embeddings in ${duration}ms.`);
