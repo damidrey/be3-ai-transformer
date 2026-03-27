@@ -1,5 +1,6 @@
 import embeddingService from './embeddingService.js';
 import dataLoader from './dataLoader.js';
+import tokenDemasker from './tokenDemasker.js';
 
 class IntentMatcher {
     constructor() {
@@ -12,10 +13,10 @@ class IntentMatcher {
         
         let processedData = rawData;
 
-        // NEW: Apply Pruning if requested
+        // Apply Pruning if requested (now very effective due to structural de-masking)
         if (options.prune) {
             const threshold = typeof options.prune === 'number' ? options.prune : 0.15;
-            console.log(`[IntentMatcher] ✂️  Automatic Pruning active (threshold: ${threshold})`);
+            console.log(`[IntentMatcher] ✂️  Structural Pruning active (threshold: ${threshold})`);
             processedData = await this.pruneIntents(rawData, threshold);
         }
 

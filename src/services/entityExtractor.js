@@ -145,18 +145,19 @@ class EntityExtractor {
                 if (score >= threshold) {
                     const type = entity.type;
                     const key = entity.key || entity.text;
-                    const value = entity.text;
+                    const confidenceKey = (type === 'attribute') ? segment : key;
 
                     if (type === 'category') results.category.add(key);
                     if (type === 'vendor') results.vendor.add(key);
                     if (type === 'clause') results.clause.add(key);
                     if (type === 'attribute') {
                         if (!results.attribute[entity.subType]) results.attribute[entity.subType] = new Set();
-                        results.attribute[entity.subType].add(value);
+                        // Use the actual matched segment from user text, not the training variation
+                        results.attribute[entity.subType].add(segment);
                     }
 
                     // Track highest confidence for each resolved key
-                    const uniqueKey = entity.subType ? `${type}:${entity.subType}:${key}` : `${type}:${key}`;
+                    const uniqueKey = entity.subType ? `${type}:${entity.subType}:${confidenceKey}` : `${type}:${confidenceKey}`;
                     if (!confidence[uniqueKey] || score > confidence[uniqueKey]) {
                         confidence[uniqueKey] = score;
                     }

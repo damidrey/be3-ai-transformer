@@ -8,31 +8,26 @@ class TokenDemasker {
     }
 
     /**
-     * Replaces masked tokens with random words from the dictionary or dynamic context.
+     * Replaces masked tokens with their name (stripping brackets).
+     * e.g. [product] -> product
      * @param {string} text 
-     * @param {Object} dynamicContext { vendors, categories, attributes }
      * @returns {string}
      */
-    demask(text, dynamicContext = {}) {
+    demask(text) {
         if (!text || typeof text !== 'string') return text;
 
         let demaskedText = text;
 
-        const masks = {
-            '\\[product\\]': PRODUCT_WORDS,
-            '\\[date\\]': DATE_WORDS,
-            '\\[vendor\\]': dynamicContext.vendors?.length ? dynamicContext.vendors : ['Generic Vendor', 'Local Store'],
-            '\\[category\\]': dynamicContext.categories?.length ? dynamicContext.categories : ['General Items', 'Products'],
-            '\\[attributes\\]': dynamicContext.attributes?.length ? dynamicContext.attributes : ['Standard', 'New Style']
-        };
-
-        for (const [pattern, words] of Object.entries(masks)) {
+        for (const mask of this.activeMasks) {
+            // Escape brackets for the regex
+            const pattern = mask.replace(/\[/g, '\\[').replace(/\]/g, '\\]');
+            const replacement = mask.replace(/\[|\]/g, ''); // [product] -> product
+            
             const regex = new RegExp(pattern, 'g');
             if (regex.test(demaskedText)) {
                 demaskedText = demaskedText.replace(regex, () => {
-                    const randomWord = words[Math.floor(Math.random() * words.length)];
                     this.demaskCount++;
-                    return randomWord;
+                    return replacement;
                 });
             }
         }
@@ -41,24 +36,23 @@ class TokenDemasker {
     }
 
     /**
-     * Processes a full intent data object.
+     * Processes a full intent data object by stripping brackets from all masks.
      * @param {Object} intentData { intentName: [variations] }
-     * @param {Object} dynamicContext { vendors, categories, attributes }
      * @returns {Object}
      */
-    demaskVariations(intentData, dynamicContext = {}) {
-        console.log('[TokenDemasker] 🎭 Starting multi-mask de-masking layer...');
+    demaskVariations(intentData) {
+        console.log('[TokenDemasker] 🛠️  Applying simple structural de-masking ([mask] -> mask)...');
         this.demaskCount = 0;
         const startTime = Date.now();
 
         const demaskedData = {};
 
         for (const [intentName, variations] of Object.entries(intentData)) {
-            demaskedData[intentName] = variations.map(v => this.demask(v, dynamicContext));
+            demaskedData[intentName] = variations.map(v => this.demask(v));
         }
 
         const duration = Date.now() - startTime;
-        console.log(`[TokenDemasker] ✅ Multi-mask de-masking complete. Tokens replaced: ${this.demaskCount}. Duration: ${duration}ms.`);
+        console.log(`[TokenDemasker] ✅ Stripping complete. Tokens modified: ${this.demaskCount}. Duration: ${duration}ms.`);
         
         return demaskedData;
     }

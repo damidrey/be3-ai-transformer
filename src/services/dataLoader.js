@@ -73,8 +73,8 @@ class DataLoader {
             console.warn('[DataLoader] Could not load dynamic context for de-masking:', err.message);
         }
 
-        // 2. Apply De-masking Layer with context
-        return tokenDemasker.demaskVariations(intentData, dynamicContext);
+        // 2. Apply De-masking Layer (now simple structural de-masking)
+        return tokenDemasker.demaskVariations(intentData);
     }
 
     /**
