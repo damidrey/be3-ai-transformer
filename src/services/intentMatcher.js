@@ -10,7 +10,7 @@ class IntentMatcher {
     async reload(options = {}) {
         console.log('[IntentMatcher] Reloading intents and regenerating embeddings...');
         const rawData = await dataLoader.loadIntents();
-        
+
         let processedData = rawData;
 
         // Apply Pruning if requested (now very effective due to structural de-masking)
@@ -110,7 +110,7 @@ class IntentMatcher {
             prunedData[intentName] = keptVariations;
             stats.total += variations.length;
             stats.kept += keptVariations.length;
-            
+
             const reduction = (((variations.length - keptVariations.length) / variations.length) * 100).toFixed(0);
             if (reduction > 0) {
                 console.log(`[Pruner] ${intentName}: ${variations.length} -> ${keptVariations.length} (-${reduction}%)`);

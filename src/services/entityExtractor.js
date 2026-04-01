@@ -4,7 +4,7 @@ import dataLoader from './dataLoader.js';
 class EntityExtractor {
     constructor() {
         this.entityEmbeddings = []; // Array of { type: 'category|vendor|clause|attribute', subType: 'brand|color|...', key, text, embedding }
-        this.thresholds = {
+        this.thresholds = embeddingService.getConfig()?.thresholds || {
             category: 0.55, // Low for conceptual matches like hungry -> food
             vendor: 0.82,   // High for brand/entity precision
             clause: 0.75,
@@ -14,6 +14,9 @@ class EntityExtractor {
 
     async reload() {
         console.log('[EntityExtractor] Reloading knowledge base and regenerating embeddings...');
+        // Refresh thresholds from the active model config
+        this.thresholds = embeddingService.getConfig()?.thresholds || this.thresholds;
+        console.log(`[EntityExtractor] Thresholds in use: ${JSON.stringify(this.thresholds)}`);
         const entities = await dataLoader.loadEntities();
         const variationsToEmbed = [];
         const metadata = [];

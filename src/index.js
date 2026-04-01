@@ -1,12 +1,11 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
-import dotenv from 'dotenv';
 import intentMatcher from './services/intentMatcher.js';
 import entityExtractor from './services/entityExtractor.js';
 import embeddingService from './services/embeddingService.js';
-
-dotenv.config();
+import { listModelConfigs } from './services/modelRegistry.js';
 
 const app = express();
 const PORT = process.env.PORT || 3009;
@@ -18,7 +17,9 @@ app.use(bodyParser.json());
 app.get('/status', (req, res) => {
     res.json({
         status: 'online',
-        model: 'all-MiniLM-L6-v2',
+        model: embeddingService.getConfig().modelName,
+        model_key: embeddingService.getConfig().key,
+        model_config: embeddingService.getConfig(),
         intentsLoaded: intentMatcher.intentEmbeddings.length,
         entitiesLoaded: entityExtractor.entityEmbeddings.length,
         timestamp: new Date().toISOString()
@@ -134,7 +135,7 @@ app.post('/analyze', async (req, res) => {
  * Body: { "text": "laptops" } OR { "texts": ["laptop", "phone"] }
  */
 app.post('/embed', async (req, res) => {
-    const { text, texts } = req.body;
+    const { text, texts, purpose } = req.body;
     const input = texts || text;
 
     if (!input) {
@@ -150,7 +151,7 @@ app.post('/embed', async (req, res) => {
         }
         
         const startTime = Date.now();
-        const embeddings = await embeddingService.getEmbeddings(input);
+        const embeddings = await embeddingService.getEmbeddings(input, { purpose });
         const duration = Date.now() - startTime;
 
         res.json({
@@ -164,6 +165,48 @@ app.post('/embed', async (req, res) => {
         console.error('[API] Embedding error:', err);
         res.status(500).json({ error: 'Internal server error', details: err.message });
     }
+});
+
+/**
+ * Endpoint: Switch Model
+ * POST /model
+ * Body: { "modelKey": "minilm" }
+ */
+app.post('/model', async (req, res) => {
+    const { modelKey } = req.body;
+    if (!modelKey) {
+        return res.status(400).json({ error: 'modelKey field is required' });
+    }
+
+    try {
+        await embeddingService.setModel(modelKey);
+        const startTime = Date.now();
+        await Promise.all([
+            intentMatcher.reload(),
+            entityExtractor.reload()
+        ]);
+        const duration = Date.now() - startTime;
+
+        res.json({
+            success: true,
+            model: embeddingService.getConfig().modelName,
+            model_key: embeddingService.getConfig().key,
+            model_config: embeddingService.getConfig(),
+            reload_duration: `${duration}ms`
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to switch model', details: err.message });
+    }
+});
+
+/**
+ * Endpoint: List available model presets
+ * GET /models
+ */
+app.get('/models', (req, res) => {
+    res.json({
+        models: listModelConfigs()
+    });
 });
 
 /**
@@ -209,7 +252,7 @@ const server = app.listen(PORT, async () => {
             entityExtractor.reload()
         ]);
     } catch (err) {
-        console.error('❌ Failed to load knowledge base during startup:', err.message);
+        console.error('❌ Failed to load knowledge base during startup:', err);
     }
 
     // Set up periodic auto-reload (every 30 minutes) to keep de-masking context fresh
