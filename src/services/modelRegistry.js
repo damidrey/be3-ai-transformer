@@ -35,6 +35,23 @@ const MODEL_PRESETS = {
             clause: 0.82,
             attribute: 0.82
         }
+    },
+    'clip-vit-base-patch32': {
+        key: 'clip-vit-base-patch32',
+        label: 'CLIP (Visual)',
+        modelName: 'Xenova/clip-vit-base-patch32',
+        dimensions: 512,
+        pooling: 'none',
+        normalize: true,
+        quantized: true,
+        prefixMode: 'none',
+        maxLength: 77,
+        thresholds: {
+            category: 0.25,
+            vendor: 0.35,
+            clause: 0.30,
+            attribute: 0.30
+        }
     }
 };
 
@@ -59,6 +76,7 @@ function buildConfigFromEnv(env = process.env) {
         dimensions: env.EMBEDDING_DIMENSIONS ? parseInt(env.EMBEDDING_DIMENSIONS) : (preset?.dimensions || 384),
         pooling: env.EMBEDDING_POOLING || preset?.pooling || 'mean',
         normalize: env.EMBEDDING_NORMALIZE ? env.EMBEDDING_NORMALIZE === 'true' : (preset?.normalize ?? true),
+        quantized: env.EMBEDDING_QUANTIZED ? env.EMBEDDING_QUANTIZED === 'true' : (preset?.quantized ?? false),
         prefixMode: env.EMBEDDING_PREFIX_MODE || preset?.prefixMode || 'none',
         maxLength: env.EMBEDDING_MAX_LENGTH ? parseInt(env.EMBEDDING_MAX_LENGTH) : (preset?.maxLength || 1000),
         queryPrefix: env.EMBEDDING_QUERY_PREFIX || preset?.queryPrefix || 'query: ',

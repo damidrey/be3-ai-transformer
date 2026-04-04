@@ -11,7 +11,8 @@ const app = express();
 const PORT = process.env.PORT || 3009;
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Health Check
 app.get('/status', (req, res) => {
@@ -135,34 +136,71 @@ app.post('/analyze', async (req, res) => {
  * Body: { "text": "laptops" } OR { "texts": ["laptop", "phone"] }
  */
 app.post('/embed', async (req, res) => {
-    const { text, texts, purpose } = req.body;
-    const input = texts || text;
+    const { text, texts, image, images, purpose, type } = req.body;
+    const input = texts || text || images || image;
 
     if (!input) {
-        return res.status(400).json({ error: 'Text or texts field is required' });
+        return res.status(400).json({ error: 'Text or image input is required' });
     }
 
     try {
         const isBatch = Array.isArray(input);
+        const inputType = type || (image || images ? 'image' : 'text');
+
         if (isBatch) {
-            input.forEach(text => console.log(`[API] Batch Embedding: "${text}"`));
+            console.log(`[API] Batch Embedding (${inputType}): ${input.length} items`);
         } else {
-            console.log(`[API] Embedding: "${input}"`);
+            const display = typeof input === 'string' ? input.substring(0, 50) : 'Buffer/Binary';
+            console.log(`[API] Embedding (${inputType}): "${display}"`);
         }
-        
+
         const startTime = Date.now();
-        const embeddings = await embeddingService.getEmbeddings(input, { purpose });
+        const embeddings = await embeddingService.getEmbeddings(input, { purpose, type: inputType });
         const duration = Date.now() - startTime;
 
         res.json({
-            text: isBatch ? undefined : input,
-            texts: isBatch ? input : undefined,
             embeddings,
-            dimensions: embeddings[0]?.length || 0,
+            dimensions: (embeddings && embeddings[0]) ? embeddings[0].length : 0,
+            inputType,
+            isBatch,
             duration: `${duration}ms`
         });
     } catch (err) {
         console.error('[API] Embedding error:', err);
+        res.status(500).json({ error: 'Internal server error', details: err.message });
+    }
+});
+
+/**
+ * Endpoint: Generate Image Embeddings
+ * POST /embed-image
+ * Body: { "image": "base64..." } OR { "images": ["base64...", "..."] }
+ */
+app.post('/embed-image', async (req, res) => {
+    const { image, images, purpose } = req.body;
+    const input = images || image;
+
+    if (!input) {
+        return res.status(400).json({ error: 'Image or images field is required' });
+    }
+
+    try {
+        const isBatch = Array.isArray(input);
+        console.log(`[API] Embedding Image(s): ${isBatch ? input.length : 1} items`);
+
+        const startTime = Date.now();
+        const embeddings = await embeddingService.getEmbeddings(input, { purpose, type: 'image' });
+        const duration = Date.now() - startTime;
+
+        res.json({
+            embeddings,
+            dimensions: (embeddings && embeddings[0]) ? embeddings[0].length : 0,
+            inputType: 'image',
+            isBatch,
+            duration: `${duration}ms`
+        });
+    } catch (err) {
+        console.error('[API] Image Embedding error:', err);
         res.status(500).json({ error: 'Internal server error', details: err.message });
     }
 });
@@ -256,7 +294,7 @@ const server = app.listen(PORT, async () => {
     }
 
     // Set up periodic auto-reload (every 30 minutes) to keep de-masking context fresh
-    const RELOAD_INTERVAL = 30 * 60 * 1000; 
+    const RELOAD_INTERVAL = 30 * 60 * 1000;
     setInterval(async () => {
         console.log(`\n[Auto-Reload] 🔄 Triggering periodic knowledge base update...`);
         try {
