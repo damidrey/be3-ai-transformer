@@ -6,6 +6,7 @@ const MODEL_PRESETS = {
         key: 'minilm',
         label: 'MiniLM',
         modelName: 'Xenova/all-MiniLM-L6-v2',
+        hfModelId: 'sentence-transformers/all-MiniLM-L6-v2',
         dimensions: 384,
         pooling: 'mean',
         normalize: true,
@@ -22,6 +23,7 @@ const MODEL_PRESETS = {
         key: 'bge-small',
         label: 'BGE Small',
         modelName: 'Xenova/bge-small-en-v1.5',
+        hfModelId: 'BAAI/bge-small-en-v1.5',
         dimensions: 384,
         pooling: 'cls',
         normalize: true,
@@ -40,6 +42,7 @@ const MODEL_PRESETS = {
         key: 'clip-vit-base-patch32',
         label: 'CLIP (Visual)',
         modelName: 'Xenova/clip-vit-base-patch32',
+        hfModelId: 'openai/clip-vit-base-patch32',
         dimensions: 512,
         pooling: 'none',
         normalize: true,
@@ -73,6 +76,7 @@ function buildConfigFromEnv(env = process.env) {
         key: envKey || preset?.key || 'bge-small',
         label: preset?.label || envKey || 'Custom',
         modelName: env.EMBEDDING_MODEL_NAME || preset?.modelName || 'Xenova/bge-small-en-v1.5',
+        hfModelId: env.HF_MODEL_ID || preset?.hfModelId || 'BAAI/bge-small-en-v1.5',
         dimensions: env.EMBEDDING_DIMENSIONS ? parseInt(env.EMBEDDING_DIMENSIONS) : (preset?.dimensions || 384),
         pooling: env.EMBEDDING_POOLING || preset?.pooling || 'mean',
         normalize: env.EMBEDDING_NORMALIZE ? env.EMBEDDING_NORMALIZE === 'true' : (preset?.normalize ?? true),
@@ -91,6 +95,7 @@ function buildConfigFromEnv(env = process.env) {
 
     return override;
 }
+
 
 export {
     MODEL_PRESETS,

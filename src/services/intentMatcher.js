@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import embeddingService from './embeddingService.js';
 import dataLoader from './dataLoader.js';
 import tokenDemasker from './tokenDemasker.js';
@@ -5,18 +7,34 @@ import tokenDemasker from './tokenDemasker.js';
 class IntentMatcher {
     constructor() {
         this.intentEmbeddings = []; // Array of { intentName, text, embedding }
+        this.cachePath = path.join(process.cwd(), 'data/knowledge-base.json');
     }
 
     async reload(options = {}) {
-        console.log('[IntentMatcher] Reloading intents and regenerating embeddings...');
-        const rawData = await dataLoader.loadIntents();
+        // 1. Check for Pre-computed Vector Cache
+        if (!options.skipCache && fs.existsSync(this.cachePath)) {
+            try {
+                const cache = JSON.parse(fs.readFileSync(this.cachePath, 'utf8'));
+                const activeModel = embeddingService.getConfig().key;
 
+                if (cache.model === activeModel && cache.intents) {
+                    console.log(`[IntentMatcher] 📦 Loaded ${cache.intents.length} embeddings from vector cache (${cache.model}).`);
+                    this.intentEmbeddings = cache.intents;
+                    return;
+                } else if (cache.model !== activeModel) {
+                    console.warn(`[IntentMatcher] ⚠️  Cache model (${cache.model}) mismatch with active model (${activeModel}). Regenerating...`);
+                }
+            } catch (err) {
+                console.warn(`[IntentMatcher] ⚠️  Failed to load cache: ${err.message}. Regenerating...`);
+            }
+        }
+
+        console.log('[IntentMatcher] Regenerating intent embeddings (No valid cache found)...');
+        const rawData = await dataLoader.loadIntents();
         let processedData = rawData;
 
-        // Apply Pruning if requested (now very effective due to structural de-masking)
         if (options.prune) {
             const threshold = typeof options.prune === 'number' ? options.prune : 0.15;
-            console.log(`[IntentMatcher] ✂️  Structural Pruning active (threshold: ${threshold})`);
             processedData = await this.pruneIntents(rawData, threshold);
         }
 
@@ -31,14 +49,11 @@ class IntentMatcher {
         }
 
         const total = allVariations.length;
-        if (total === 0) {
-            console.warn('[IntentMatcher] No variations found to embed.');
-            return;
-        }
+        if (total === 0) return;
 
         console.log(`[IntentMatcher] Generating embeddings for ${total} variations...`);
         const startTime = Date.now();
-        const BATCH_SIZE = 50;
+        const BATCH_SIZE = embeddingService.mode === 'cloud' ? 20 : 50; 
         const allEmbeddings = [];
 
         for (let i = 0; i < total; i += BATCH_SIZE) {
@@ -48,14 +63,10 @@ class IntentMatcher {
 
             if (i % (BATCH_SIZE * 5) === 0 || i + BATCH_SIZE >= total) {
                 const progress = Math.min(100, ((i + chunk.length) / total * 100)).toFixed(1);
-                console.log(`[IntentMatcher] Progress: ${i + chunk.length}/${total} variations (${progress}%)`);
+                console.log(`[IntentMatcher] Progress: ${progress}%`);
             }
-
-            // Yield to event loop to allow signal handling
             await new Promise(resolve => setTimeout(resolve, 0));
         }
-
-        const duration = Date.now() - startTime;
 
         this.intentEmbeddings = allVariations.map((text, i) => ({
             intentName: intentNames[i],
@@ -63,8 +74,9 @@ class IntentMatcher {
             embedding: allEmbeddings[i]
         }));
 
-        console.log(`[IntentMatcher] Generated ${this.intentEmbeddings.length} embeddings in ${duration}ms.`);
+        console.log(`[IntentMatcher] Generated ${this.intentEmbeddings.length} embeddings in ${Date.now() - startTime}ms.`);
     }
+
 
     /**
      * Internal pruning protocol using Cosine Distance

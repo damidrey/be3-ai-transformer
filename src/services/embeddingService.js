@@ -1,4 +1,5 @@
 import { pipeline, env, RawImage } from '@huggingface/transformers';
+import { HfInference } from '@huggingface/inference';
 import { buildConfigFromEnv, getModelConfig } from './modelRegistry.js';
 
 // Setup environment for explicit caching and better logging
@@ -7,108 +8,136 @@ env.allowLocalModels = false;
 env.useBrowserCache = false;
 
 const CLIP_MODEL = 'Xenova/clip-vit-base-patch32';
+const CLIP_MODEL_HF = 'openai/clip-vit-base-patch32';
 
 class EmbeddingService {
     constructor() {
-        this.pipe = null;        // Text embedding pipeline (BGE/MiniLM)
-        this.clipPipe = null;    // CLIP vision pipeline (lazy-loaded separately)
+        this.pipe = null;        // Text embedding pipeline (Local)
+        this.clipPipe = null;    // CLIP vision pipeline (Local)
+        this.hf = null;          // HF Inference Client (Cloud)
         this.config = buildConfigFromEnv();
+        this.mode = process.env.EMBEDDING_MODE || 'local'; // 'local' or 'cloud'
+
+        if (this.mode === 'cloud') {
+            const token = process.env.HF_TOKEN;
+            if (!token) {
+                console.warn('[EmbeddingService] Cloud mode active but HF_TOKEN is missing! Falling back to local.');
+                this.mode = 'local';
+            } else {
+                this.hf = new HfInference(token);
+                console.log(`[EmbeddingService] ☁️  Cloud Inference Mode active (${this.config.modelName})`);
+            }
+        } else {
+             console.log(`[EmbeddingService] 🏠 Local Transformers.js Mode active (${this.config.modelName})`);
+        }
     }
 
     async init() {
+        if (this.mode === 'cloud') return; // No local init needed for cloud mode
         if (this.pipe) return;
-        console.log(`[EmbeddingService] Initializing ${this.config.modelName}...`);
-        console.log(`[EmbeddingService] Cache directory: ${env.cacheDir}`);
-
+        
+        console.log(`[EmbeddingService] Initializing ${this.config.modelName} (Local)...`);
         try {
             this.pipe = await pipeline(
                 'feature-extraction',
-                this.config.modelName,
+                this.config.modelName, // Xenova slug
                 {
                     quantized: this.config.quantized,
                     progress_callback: (p) => {
                         if (p.status === 'progress') {
                             const percent = (p.loaded / p.total * 100).toFixed(1);
-                            console.log(`[EmbeddingService] Downloading ${p.file}: ${percent}% (${(p.loaded / 1024 / 1024).toFixed(1)}MB / ${(p.total / 1024 / 1024).toFixed(1)}MB)`);
-                        } else if (p.status === 'initiate') {
-                            console.log(`[EmbeddingService] Initiating download: ${p.file}`);
-                        } else if (p.status === 'done') {
-                            console.log(`[EmbeddingService] Download complete: ${p.file}`);
+                            console.log(`[EmbeddingService] Downloading... ${percent}%`);
                         }
                     }
                 }
             );
-            console.log(`[EmbeddingService] Model loaded successfully.`);
+            console.log(`[EmbeddingService] Local model loaded.`);
         } catch (err) {
-            console.error(`[EmbeddingService] CRITICAL: Failed to load model. This is often due to an interrupted network connection or corrupted cache.`);
-            console.error(`[EmbeddingService] Error detail: ${err.message}`);
-            if (err.message.includes('Protobuf')) {
-                console.error(`[EmbeddingService] HINT: The model file is corrupted. Try deleting the ${env.cacheDir} folder and restarting.`);
-            }
+            console.error(`[EmbeddingService] Local init failed: ${err.message}`);
             throw err;
         }
     }
 
-    /**
-     * Lazy-load the CLIP vision pipeline (separate from text pipeline).
-     * Uses 'image-feature-extraction' which runs the vision encoder only.
-     */
     async initClip() {
+        if (this.mode === 'cloud') return; // No local init needed
         if (this.clipPipe) return;
-        console.log(`[EmbeddingService] Initializing CLIP vision encoder (${CLIP_MODEL})...`);
+        
+        console.log(`[EmbeddingService] Initializing CLIP vision encoder (Local)...`);
         try {
             this.clipPipe = await pipeline(
                 'image-feature-extraction',
                 CLIP_MODEL,
-                {
-                    quantized: true,
-                    progress_callback: (p) => {
-                        if (p.status === 'progress') {
-                            const pct = (p.loaded / p.total * 100).toFixed(1);
-                            console.log(`[CLIP] Downloading ${p.file}: ${pct}%`);
-                        } else if (p.status === 'done') {
-                            console.log(`[CLIP] ${p.file} ready.`);
-                        }
-                    }
-                }
+                { quantized: true }
             );
-            console.log(`[EmbeddingService] CLIP vision encoder ready (512D).`);
+            console.log(`[EmbeddingService] Local CLIP ready.`);
         } catch (err) {
-            console.error(`[EmbeddingService] Failed to load CLIP:`, err.message);
+             console.error(`[EmbeddingService] Local CLIP fail: ${err.message}`);
+             throw err;
+        }
+    }
+
+    /**
+     * Switch the active embedding model.
+     */
+    async setModel(modelKey) {
+        const next = getModelConfig(modelKey);
+        if (!next) throw new Error(`Unknown model key: ${modelKey}`);
+        this.pipe = null;
+        this.config = { ...next };
+        console.log(`[EmbeddingService] Switched model to ${this.config.modelName}`);
+    }
+
+    /**
+     * Cloud Inference: Get embeddings from HF API
+     */
+    async getCloudEmbeddings(input, options = {}) {
+        const modelId = this.config.hfModelId || this.config.modelName.replace('Xenova/', 'sentence-transformers/');
+        
+        try {
+            if (options.type === 'image') {
+                // HF Feature Extraction supports images if passed as Blobs or Buffers
+                const results = await Promise.all((Array.isArray(input) ? input : [input]).map(async (img) => {
+                    let blob;
+                    if (typeof img === 'string' && img.startsWith('data:')) {
+                        const base64Data = img.split(',')[1];
+                        blob = new Blob([Buffer.from(base64Data, 'base64')]);
+                    } else if (img.startsWith('http')) {
+                        const response = await fetch(img);
+                        blob = await response.blob();
+                    }
+                    
+                    return this.hf.featureExtraction({
+                        model: CLIP_MODEL_HF,
+                        inputs: blob,
+                        provider: "hf-inference"
+                    });
+                }));
+                return results;
+            }
+
+            // Text embeddings
+            const purpose = options.purpose || 'default';
+            const prepared = this.prepareTexts(input, purpose);
+            
+            const results = await this.hf.featureExtraction({
+                model: modelId,
+                inputs: prepared,
+                provider: "hf-inference"
+            });
+            
+            // HuggingFace returns raw array for single input, or nested for batch
+            return Array.isArray(input) ? results : [results];
+        } catch (err) {
+            console.error(`[EmbeddingService] Cloud extraction failed: ${err.message}`);
             throw err;
         }
     }
 
-    /**
-     * Switch the active embedding model (clears cached pipeline).
-     * @param {string} modelKey
-     */
-    async setModel(modelKey) {
-        const next = getModelConfig(modelKey);
-        if (!next) {
-            throw new Error(`Unknown model key: ${modelKey}`);
-        }
-        this.pipe = null;
-        this.config = {
-            ...next
-        };
-        console.log(`[EmbeddingService] Switched model to ${this.config.modelName} (${this.config.key})`);
-    }
-
-    /**
-     * Returns current model config.
-     */
-    getConfig() {
-        return this.config;
-    }
-
-    /**
-     * Generates embeddings for the given texts or images.
-     * @param {string|string[]} input
-     * @param {{ purpose?: 'query'|'passage'|'default', type?: 'image'|'text' }} options
-     * @returns {Promise<number[][]>}
-     */
     async getEmbeddings(input, options = {}) {
+        if (this.mode === 'cloud') {
+            return this.getCloudEmbeddings(input, options);
+        }
+
         if (options.type === 'image') {
             return this.getImageEmbeddings(input);
         }
@@ -121,55 +150,34 @@ class EmbeddingService {
         return output.tolist();
     }
 
-    /**
-     * Generates 512D CLIP embeddings for images using the dedicated vision encoder.
-     * Handles URLs and base64 data URIs.
-     * @param {string|string[]} input - URL or base64 data URI
-     * @returns {Promise<number[][]>}
-     */
     async getImageEmbeddings(input) {
-        await this.initClip(); // Use CLIP pipeline, not text pipeline
+        await this.initClip();
 
         const isArray = Array.isArray(input);
         const inputs = isArray ? input : [input];
-
         const results = [];
+
         for (const imageSource of inputs) {
             try {
                 let image;
-
                 if (typeof imageSource === 'string' && imageSource.startsWith('data:')) {
-                    // base64 data URI — extract the base64 payload and convert to Buffer
-                    const base64Data = imageSource.split(',')[1];
-                    if (!base64Data) throw new Error('Malformed base64 data URI');
-                    const buffer = Buffer.from(base64Data, 'base64');
+                    const buffer = Buffer.from(imageSource.split(',')[1], 'base64');
                     image = await RawImage.fromBlob(new Blob([buffer]));
                 } else {
-                    // Regular URL or file path
                     image = await RawImage.read(imageSource);
                 }
 
                 const output = await this.clipPipe(image, { pooling: 'mean', normalize: true });
-                // image-feature-extraction returns shape [1, 512] — grab first row
-                const tensor = output;
-                const arr = tensor.tolist ? tensor.tolist() : Array.from(tensor.data);
-                // If nested (batch), unwrap
+                const arr = output.tolist ? output.tolist() : Array.from(output.data);
                 results.push(Array.isArray(arr[0]) ? arr[0] : arr);
             } catch (err) {
-                console.error(`[EmbeddingService] Failed to embed image: ${String(imageSource).substring(0, 100)}`, err.message);
+                console.error(`[EmbeddingService] Image embed fail:`, err.message);
                 results.push(null);
             }
         }
-
         return isArray ? results : [results[0]];
     }
 
-    /**
-     * Apply model-specific formatting. For BGE, use query/passage prefixes.
-     * @param {string|string[]} texts
-     * @param {string} purpose
-     * @returns {string|string[]}
-     */
     prepareTexts(texts, purpose) {
         const isArray = Array.isArray(texts);
         const arr = isArray ? texts : [texts];
@@ -186,6 +194,11 @@ class EmbeddingService {
 
         return isArray ? prepared : prepared[0];
     }
+
+    getConfig() {
+        return this.config;
+    }
 }
 
 export default new EmbeddingService();
+

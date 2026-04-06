@@ -4,12 +4,47 @@ import tokenDemasker from './tokenDemasker.js';
 
 class DataLoader {
     constructor() {
-        // Paths to the be3_ai project
-        this.be3AiBase = 'C:\\Users\\chatz\\Downloads\\eCommerce\\be3_ai';
-        this.intentsBaseDir = path.join(this.be3AiBase, 'src\\services\\intentResolver\\semanticLab\\intents');
-        this.storeContextPath = path.join(this.be3AiBase, 'src\\context\\storeContext.js');
-        this.clausesBenchPath = path.join(this.be3AiBase, 'src\\services\\intentResolver\\semanticLab\\clauses\\clause_bench.json');
-        this.facetsBenchPath = path.join(this.be3AiBase, 'src\\services\\intentResolver\\semanticLab\\facets\\facet_bench.json');
+        // 1. Determine Base Directories
+        // Default to absolute paths for local dev, but allow override for Render
+        this.be3AiBase = process.env.BE3_AI_PATH || 'C:\\Users\\chatz\\Downloads\\eCommerce\\be3_ai';
+        this.localDataDir = path.join(process.cwd(), 'data');
+
+        // 2. Resolve Paths (Priority: Env -> Absolute -> Local)
+        this.intentsBaseDir = this.resolvePath(
+            process.env.INTENTS_DIR, 
+            path.join(this.be3AiBase, 'src/services/intentResolver/semanticLab/intents'),
+            path.join(this.localDataDir, 'intents')
+        );
+
+        this.storeContextPath = this.resolvePath(
+            process.env.STORE_CONTEXT_PATH,
+            path.join(this.be3AiBase, 'src/context/storeContext.js'),
+            path.join(this.localDataDir, 'storeContext.js')
+        );
+
+        this.clausesBenchPath = this.resolvePath(
+            process.env.CLAUSES_BENCH_PATH,
+            path.join(this.be3AiBase, 'src/services/intentResolver/semanticLab/clauses/clause_bench.json'),
+            path.join(this.localDataDir, 'clause_bench.json')
+        );
+
+        this.facetsBenchPath = this.resolvePath(
+            process.env.FACETS_BENCH_PATH,
+            path.join(this.be3AiBase, 'src/services/intentResolver/semanticLab/facets/facet_bench.json'),
+            path.join(this.localDataDir, 'facet_bench.json')
+        );
+    }
+
+    /**
+     * Resolves a path by checking several options in order.
+     */
+    resolvePath(envVar, absolutePath, localPath) {
+        if (envVar && fs.existsSync(envVar)) return envVar;
+        if (fs.existsSync(absolutePath)) return absolutePath;
+        if (fs.existsSync(localPath)) return localPath;
+        
+        // Fallback to localPath even if it doesn't exist yet (for sync script)
+        return localPath;
     }
 
     /**
@@ -25,23 +60,24 @@ class DataLoader {
             return {};
         }
 
-        const folders = fs.readdirSync(this.intentsBaseDir);
+        const items = fs.readdirSync(this.intentsBaseDir);
 
-        for (const folder of folders) {
+        for (const item of items) {
+            const itemPath = path.join(this.intentsBaseDir, item);
+            if (!fs.statSync(itemPath).isDirectory()) continue;
+
             // Suspend deprecated/suspended intents
-            if (folder === 'check_availability' || folder === 'browse_collection') {
-                console.log(`[DataLoader] Skipping suspended intent: ${folder}`);
+            if (item === 'check_availability' || item === 'browse_collection') {
                 continue;
             }
 
-            const benchPath = path.join(this.intentsBaseDir, folder, 'bench.json');
+            const benchPath = path.join(itemPath, 'bench.json');
 
             if (fs.existsSync(benchPath)) {
                 try {
                     const content = fs.readFileSync(benchPath, 'utf8');
                     const bench = JSON.parse(content);
 
-                    // bench.json structure: { "intent_name": { "variations": [...] } }
                     for (const [intentName, data] of Object.entries(bench)) {
                         if (data.variations && Array.isArray(data.variations)) {
                             if (!intentData[intentName]) {
@@ -56,24 +92,6 @@ class DataLoader {
             }
         }
         
-        // 1. Fetch Dynamic Context from be3_ai
-        let dynamicContext = {};
-        try {
-            const entities = await this.loadEntities();
-            dynamicContext = {
-                vendors: entities.vendor.map(v => v.label),
-                categories: entities.category.map(c => c.label),
-                // Flatten all possible attribute values into one pool for [attributes]
-                attributes: [
-                    ...Object.values(entities.attribute).flat(),
-                    ...Object.values(entities.clause).flat()
-                ]
-            };
-        } catch (err) {
-            console.warn('[DataLoader] Could not load dynamic context for de-masking:', err.message);
-        }
-
-        // 2. Apply De-masking Layer (now simple structural de-masking)
         return tokenDemasker.demaskVariations(intentData);
     }
 
@@ -81,7 +99,7 @@ class DataLoader {
      * Load knowledge entities for semantic extraction.
      */
     async loadEntities() {
-        console.log('[DataLoader] Loading entities from be3_ai...');
+        console.log(`[DataLoader] Loading entities...`);
         const entities = {
             category: [],
             vendor: [],
@@ -94,15 +112,22 @@ class DataLoader {
             try {
                 const content = fs.readFileSync(this.storeContextPath, 'utf8');
 
-                // Helper to extract JSON-like object from a JS file
+                // Improved extractor that handles ES modules and commonjs
                 const extractObject = (varName) => {
-                    const regex = new RegExp(`const ${varName} = ({[\\s\\S]*?});`, 'm');
+                    const regex = new RegExp(`(?:const|let|var|export const) ${varName} = ({[\\s\\S]*?});`, 'm');
                     const match = content.match(regex);
                     if (match && match[1]) {
                         try {
-                            return JSON.parse(match[1]);
+                            // Try clean JSON first
+                            return JSON.parse(match[1].replace(/(\w+):/g, '"$1":').replace(/'/g, '"'));
                         } catch (e) {
-                            return eval(`(${match[1]})`);
+                            // Fallback to eval-like logic (safe here since we're local)
+                            try {
+                                return new Function(`return ${match[1]}`)();
+                            } catch (e2) {
+                                console.error(`[DataLoader] Failed to parse ${varName}:`, e2.message);
+                                return null;
+                            }
                         }
                     }
                     return null;
@@ -114,15 +139,14 @@ class DataLoader {
                         const variations = [c.label, c.slug.replace(/-/g, ' ')];
                         if (c.description) variations.push(c.description);
 
-                        // Add children labels as variations (helps match parent)
-                        if (c.children && c.children.length > 0) {
+                        if (c.children) {
                             c.children.forEach(childKey => {
                                 const child = categories[childKey];
                                 if (child) variations.push(child.label);
                             });
                         }
 
-                        // Conceptual augmentation for common but distinct terms
+                        // Conceptual augmentation
                         if (key === 'phone_accessories') variations.push('airpods', 'headphones', 'earbuds', 'chargers', 'cases');
                         if (key === 'food') variations.push('hungry', 'eat', 'meal', 'snacks');
                         if (key === 'sound_gadget') variations.push('airpods', 'headphones', 'music', 'sound');
@@ -199,9 +223,9 @@ class DataLoader {
             }
         }
 
-        console.log(`[DataLoader] Summary: ${entities.category.length} categories, ${entities.vendor.length} vendors, ${Object.keys(entities.clause).length} clause types, ${Object.keys(entities.attribute).length} attribute types.`);
         return entities;
     }
 }
 
 export default new DataLoader();
+

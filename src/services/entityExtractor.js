@@ -1,22 +1,41 @@
+import fs from 'fs';
+import path from 'path';
 import embeddingService from './embeddingService.js';
 import dataLoader from './dataLoader.js';
 
 class EntityExtractor {
     constructor() {
-        this.entityEmbeddings = []; // Array of { type: 'category|vendor|clause|attribute', subType: 'brand|color|...', key, text, embedding }
+        this.entityEmbeddings = []; // Array of { type, subType, key, text, embedding }
+        this.cachePath = path.join(process.cwd(), 'data/knowledge-base.json');
         this.thresholds = embeddingService.getConfig()?.thresholds || {
-            category: 0.55, // Low for conceptual matches like hungry -> food
-            vendor: 0.82,   // High for brand/entity precision
+            category: 0.55,
+            vendor: 0.82,
             clause: 0.75,
             attribute: 0.75
         };
     }
 
-    async reload() {
-        console.log('[EntityExtractor] Reloading knowledge base and regenerating embeddings...');
-        // Refresh thresholds from the active model config
+    async reload(options = {}) {
+        // 1. Check for Pre-computed Vector Cache
+        if (!options.skipCache && fs.existsSync(this.cachePath)) {
+            try {
+                const cache = JSON.parse(fs.readFileSync(this.cachePath, 'utf8'));
+                const activeModel = embeddingService.getConfig().key;
+
+                if (cache.model === activeModel && cache.entities) {
+                    console.log(`[EntityExtractor] 📦 Loaded ${cache.entities.length} embeddings from vector cache (${cache.model}).`);
+                    this.entityEmbeddings = cache.entities;
+                    this.thresholds = embeddingService.getConfig()?.thresholds || this.thresholds;
+                    return;
+                }
+            } catch (err) {
+                console.warn(`[EntityExtractor] ⚠️  Failed to load cache: ${err.message}. Regenerating...`);
+            }
+        }
+
+        console.log('[EntityExtractor] Regenerating entity embeddings (No valid cache found)...');
         this.thresholds = embeddingService.getConfig()?.thresholds || this.thresholds;
-        console.log(`[EntityExtractor] Thresholds in use: ${JSON.stringify(this.thresholds)}`);
+        
         const entities = await dataLoader.loadEntities();
         const variationsToEmbed = [];
         const metadata = [];
@@ -54,14 +73,11 @@ class EntityExtractor {
         }
 
         const total = variationsToEmbed.length;
-        if (total === 0) {
-            console.warn('[EntityExtractor] No entities found to embed.');
-            return;
-        }
+        if (total === 0) return;
 
         console.log(`[EntityExtractor] Generating embeddings for ${total} entity variations...`);
         const startTime = Date.now();
-        const BATCH_SIZE = 50;
+        const BATCH_SIZE = embeddingService.mode === 'cloud' ? 20 : 50; 
         const allEmbeddings = [];
 
         for (let i = 0; i < total; i += BATCH_SIZE) {
@@ -71,21 +87,17 @@ class EntityExtractor {
 
             if (i % (BATCH_SIZE * 5) === 0 || i + BATCH_SIZE >= total) {
                 const progress = Math.min(100, ((i + chunk.length) / total * 100)).toFixed(1);
-                console.log(`[EntityExtractor] Progress: ${i + chunk.length}/${total} entities (${progress}%)`);
+                console.log(`[EntityExtractor] Progress: ${progress}%`);
             }
-
-            // Yield to event loop
             await new Promise(resolve => setTimeout(resolve, 0));
         }
-
-        const duration = Date.now() - startTime;
 
         this.entityEmbeddings = variationsToEmbed.map((text, i) => ({
             ...metadata[i],
             embedding: allEmbeddings[i]
         }));
 
-        console.log(`[EntityExtractor] Generated ${this.entityEmbeddings.length} entity embeddings in ${duration}ms.`);
+        console.log(`[EntityExtractor] Generated ${this.entityEmbeddings.length} entity embeddings in ${Date.now() - startTime}ms.`);
     }
 
     cosineSimilarity(vecA, vecB) {
@@ -118,7 +130,6 @@ class EntityExtractor {
             }
         }
 
-        // Add the whole string as a segment too
         if (words.length > 3) {
             segments.push(text.toLowerCase());
         }
@@ -140,11 +151,6 @@ class EntityExtractor {
                 const score = this.cosineSimilarity(segEmbedding, entity.embedding);
                 const threshold = this.thresholds[entity.type] || 0.85;
 
-                // Log only if needed for internal debugging
-                // if (score >= 0.5) {
-                //     console.log(`[EntityExtractor] Segment: "${segment}" -> Entity: "${entity.text}" (${entity.type}${entity.subType ? ':' + entity.subType : ''}) | Score: ${score.toFixed(4)}`);
-                // }
-
                 if (score >= threshold) {
                     const type = entity.type;
                     const key = entity.key || entity.text;
@@ -155,11 +161,9 @@ class EntityExtractor {
                     if (type === 'clause') results.clause.add(key);
                     if (type === 'attribute') {
                         if (!results.attribute[entity.subType]) results.attribute[entity.subType] = new Set();
-                        // Use the actual matched segment from user text, not the training variation
                         results.attribute[entity.subType].add(segment);
                     }
 
-                    // Track highest confidence for each resolved key
                     const uniqueKey = entity.subType ? `${type}:${entity.subType}:${confidenceKey}` : `${type}:${confidenceKey}`;
                     if (!confidence[uniqueKey] || score > confidence[uniqueKey]) {
                         confidence[uniqueKey] = score;
@@ -168,7 +172,6 @@ class EntityExtractor {
             });
         });
 
-        // Convert Sets to Arrays for JSON response
         return {
             entities: {
                 category: Array.from(results.category),
