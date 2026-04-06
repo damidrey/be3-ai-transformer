@@ -16,3 +16,5 @@ services:
         value: bge-small
       - key: CLIP_SPACE_URL
         value: https://behug3-be3-image.hf.space
+      - key: PORT
+        value: 10000
