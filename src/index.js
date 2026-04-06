@@ -5,6 +5,7 @@ import bodyParser from 'body-parser';
 import intentMatcher from './services/intentMatcher.js';
 import entityExtractor from './services/entityExtractor.js';
 import embeddingService from './services/embeddingService.js';
+import vectorStore from './services/vectorStore.js';
 import { listModelConfigs } from './services/modelRegistry.js';
 
 const app = express();
@@ -283,25 +284,27 @@ const server = app.listen(PORT, async () => {
     const pruneEnabled = args.includes('--prune');
     const pruneThreshold = args.find(a => a.startsWith('--threshold='))?.split('=')[1] || 0.15;
 
-    // Warm up the model and load data on startup
+    // Unified Memory-Efficient Startup
     try {
-        await Promise.all([
-            intentMatcher.reload({ prune: pruneEnabled ? parseFloat(pruneThreshold) : false }),
-            entityExtractor.reload()
-        ]);
+        console.log(`\n[Server] 🏁 Starting unified knowledge base initialization...`);
+        await vectorStore.init({ 
+            prune: pruneEnabled ? parseFloat(pruneThreshold) : false 
+        });
+        
+        // Matchers and Extractors now lazily consume the unified VectorStore.
+        console.log(`[Server] ✅ Knowledge base ready (RAM optimized).`);
     } catch (err) {
         console.error('❌ Failed to load knowledge base during startup:', err);
     }
 
-    // Set up periodic auto-reload (every 30 minutes) to keep de-masking context fresh
+    // Set up periodic auto-reload (every 30 minutes)
     const RELOAD_INTERVAL = 30 * 60 * 1000;
     setInterval(async () => {
         console.log(`\n[Auto-Reload] 🔄 Triggering periodic knowledge base update...`);
         try {
-            await Promise.all([
-                intentMatcher.reload({ prune: pruneEnabled ? parseFloat(pruneThreshold) : false }),
-                entityExtractor.reload()
-            ]);
+            await vectorStore.init({ 
+                prune: pruneEnabled ? parseFloat(pruneThreshold) : false 
+            });
             console.log(`[Auto-Reload] ✅ Update complete. Next update in 30 minutes.`);
         } catch (err) {
             console.error('[Auto-Reload] ❌ Failed to auto-reload:', err.message);
