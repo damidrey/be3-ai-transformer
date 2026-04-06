@@ -1,6 +1,7 @@
 import { pipeline, env, RawImage } from '@huggingface/transformers';
 import { HfInference } from '@huggingface/inference';
 import { buildConfigFromEnv, getModelConfig } from './modelRegistry.js';
+import axios from 'axios';
 
 // Setup environment for explicit caching and better logging
 env.cacheDir = './.cache';
@@ -8,7 +9,7 @@ env.allowLocalModels = false;
 env.useBrowserCache = false;
 
 const CLIP_MODEL = 'Xenova/clip-vit-base-patch32';
-const CLIP_MODEL_HF = 'openai/clip-vit-base-patch32';
+const CLIP_MODEL_HF = 'sentence-transformers/clip-ViT-B-32';
 
 class EmbeddingService {
     constructor() {
@@ -17,6 +18,10 @@ class EmbeddingService {
         this.hf = null;          // HF Inference Client (Cloud)
         this.config = buildConfigFromEnv();
         this.mode = process.env.EMBEDDING_MODE || 'local'; // 'local' or 'cloud'
+        this.clipSpaceUrl = process.env.CLIP_SPACE_URL;
+        if (this.clipSpaceUrl) {
+            console.log(`[EmbeddingService] 🛰️  CLIP Custom Space: ${this.clipSpaceUrl}`);
+        }
 
         if (this.mode === 'cloud') {
             const token = process.env.HF_TOKEN;
@@ -95,8 +100,18 @@ class EmbeddingService {
         
         try {
             if (options.type === 'image') {
-                // HF Feature Extraction supports images if passed as Blobs or Buffers
                 const results = await Promise.all((Array.isArray(input) ? input : [input]).map(async (img) => {
+                    // 1. Check if we should use the custom CLIP Space
+                    if (this.clipSpaceUrl) {
+                        try {
+                            const res = await this.callClipSpace(null, img);
+                            return res.embedding;
+                        } catch (err) {
+                            console.warn(`[EmbeddingService] Custom CLIP Space failed, falling back to HF API: ${err.message}`);
+                        }
+                    }
+
+                    // 2. Fallback to standard HF Inference (may fail for CLIP)
                     let blob;
                     if (typeof img === 'string' && img.startsWith('data:')) {
                         const base64Data = img.split(',')[1];
@@ -108,11 +123,21 @@ class EmbeddingService {
                     
                     return this.hf.featureExtraction({
                         model: CLIP_MODEL_HF,
-                        inputs: blob,
-                        provider: "hf-inference"
+                        inputs: blob
                     });
                 }));
                 return results;
+            }
+
+            // Text embeddings
+            if (options.purpose === 'clip' || modelId.toLowerCase().includes('clip')) {
+                 if (this.clipSpaceUrl) {
+                     const results = await Promise.all((Array.isArray(input) ? input : [input]).map(async (t) => {
+                         const res = await this.callClipSpace(t, null);
+                         return res.embedding;
+                     }));
+                     return Array.isArray(input) ? results : [results[0]];
+                 }
             }
 
             // Text embeddings
@@ -193,6 +218,38 @@ class EmbeddingService {
         }
 
         return isArray ? prepared : prepared[0];
+    }
+
+    /**
+     * Call the custom Gradio API hosted on HF Spaces
+     */
+    async callClipSpace(text, image) {
+        if (!this.clipSpaceUrl) throw new Error("CLIP_SPACE_URL not configured");
+
+        const endpoint = `${this.clipSpaceUrl.replace(/\/$/, '')}/embed`;
+        console.log(`[EmbeddingService] 📡 Sending request to CLIP Space: ${endpoint}`);
+
+        const payload = {
+            text: text || null,
+            image_data: image || null
+        };
+
+        try {
+            const response = await axios.post(endpoint, payload, {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 30000 
+            });
+
+            if (response.data && response.data.embedding) {
+                console.log(`[EmbeddingService] ✅ Received embedding from Space.`);
+                return response.data;
+            }
+            throw new Error("Invalid response format from HF Space");
+        } catch (err) {
+            const msg = err.response?.data?.detail || err.message;
+            console.error(`[EmbeddingService] ❌ HF Space Error:`, msg);
+            throw new Error(`CLIP Space Error: ${msg}`);
+        }
     }
 
     getConfig() {

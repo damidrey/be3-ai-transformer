@@ -42,7 +42,7 @@ const MODEL_PRESETS = {
         key: 'clip-vit-base-patch32',
         label: 'CLIP (Visual)',
         modelName: 'Xenova/clip-vit-base-patch32',
-        hfModelId: 'openai/clip-vit-base-patch32',
+        hfModelId: 'sentence-transformers/clip-ViT-B-32',
         dimensions: 512,
         pooling: 'none',
         normalize: true,

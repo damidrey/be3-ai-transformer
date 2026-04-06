@@ -16,3 +16,5 @@ services:
         value: 10000
       - key: EMBEDDING_MODEL_KEY
         value: bge-small
+      - key: CLIP_SPACE_URL
+        value: https://behug3-be3-image.hf.space
