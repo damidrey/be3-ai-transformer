@@ -1,5 +1,6 @@
 import embeddingService from './embeddingService.js';
 import vectorStore from './vectorStore.js';
+import dataLoader from './dataLoader.js';
 
 /**
  * Service for extracting semantic entities (Category, Vendor, Clause, Attribute) 
@@ -15,11 +16,25 @@ class EntityExtractor {
         };
     }
 
+    get entityEmbeddings() {
+        return vectorStore.entities.map(item => ({
+            type: item.type,
+            subType: item.subType,
+            key: item.key,
+            text: item.text,
+            embedding: Array.from(item.embedding)
+        }));
+    }
+
     /**
      * Initializes the underlying vector store.
      */
     async reload(options = {}) {
-        await vectorStore.init(options);
+        if (options.skipCache) {
+            await this.regenerate(options);
+        } else {
+            await vectorStore.init(options);
+        }
     }
 
     /**
@@ -99,6 +114,66 @@ class EntityExtractor {
             },
             confidence
         };
+    }
+
+    async regenerate(options = {}) {
+        console.log('[EntityExtractor] Regenerating entity embeddings from raw data...');
+        const rawEntities = await dataLoader.loadEntities();
+        
+        const allEntities = [];
+        
+        // 1. Process Categories
+        rawEntities.category.forEach(c => {
+            c.variations.forEach(v => {
+                allEntities.push({ type: 'category', key: c.key, text: v });
+            });
+        });
+
+        // 2. Process Vendors
+        rawEntities.vendor.forEach(v => {
+            v.variations.forEach(vari => {
+                allEntities.push({ type: 'vendor', key: v.label, text: vari });
+            });
+        });
+
+        // 3. Process Clauses
+        Object.entries(rawEntities.clause).forEach(([key, variations]) => {
+            variations.forEach(v => {
+                allEntities.push({ type: 'clause', key: key, text: v });
+            });
+        });
+
+        // 4. Process Attributes
+        Object.entries(rawEntities.attribute).forEach(([subType, variations]) => {
+            variations.forEach(v => {
+                allEntities.push({ type: 'attribute', subType, text: v });
+            });
+        });
+
+        const total = allEntities.length;
+        if (total === 0) return;
+
+        console.log(`[EntityExtractor] Generating embeddings for ${total} entities...`);
+        const BATCH_SIZE = 50;
+        const allEmbeddings = [];
+
+        for (let i = 0; i < total; i += BATCH_SIZE) {
+            const chunk = allEntities.slice(i, i + BATCH_SIZE).map(e => e.text);
+            const embeddings = await embeddingService.getEmbeddings(chunk);
+            allEmbeddings.push(...embeddings);
+            
+            const progress = Math.min(100, ((i + chunk.length) / total * 100)).toFixed(1);
+            console.log(`[EntityExtractor] Progress: ${progress}%`);
+            await new Promise(resolve => setTimeout(resolve, 10)); // Yield to CPU
+        }
+
+        const entities = allEntities.map((ent, i) => ({
+            ...ent,
+            embedding: new Float32Array(allEmbeddings[i])
+        }));
+
+        vectorStore.setKnowledge(vectorStore.intents, entities);
+        console.log(`[EntityExtractor] Successfully regenerated ${entities.length} entities.`);
     }
 }
 

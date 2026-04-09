@@ -10,11 +10,23 @@ class IntentMatcher {
         this.cachePath = './data/knowledge-base.json';
     }
 
+    get intentEmbeddings() {
+        return vectorStore.intents.map(item => ({
+            intentName: item.intentName,
+            text: item.text,
+            embedding: Array.from(item.embedding)
+        }));
+    }
+
     /**
      * Re-initializes the vector store.
      */
     async reload(options = {}) {
-        await vectorStore.init(options);
+        if (options.skipCache) {
+            await this.regenerate(options);
+        } else {
+            await vectorStore.init(options);
+        }
     }
 
     /**
@@ -38,16 +50,45 @@ class IntentMatcher {
         return vectorStore.matchIntents(queryEmbedding, topK);
     }
 
-    /**
-     * Logic for generating new intent embeddings from raw data.
-     * Used only when the knowledge base needs a full refresh.
-     */
     async regenerate(options = {}) {
         console.log('[IntentMatcher] Regenerating intent embeddings from raw data...');
         const rawData = await dataLoader.loadIntents();
         
-        // (The logic for regenerating would go here if we wanted to support writing to the JSON cache. 
-        // For now, we assume the JSON is generated offline or by a dedicated script).
+        const allVariations = [];
+        const intentNames = [];
+
+        for (const [intentName, variations] of Object.entries(rawData)) {
+            variations.forEach(v => {
+                allVariations.push(v);
+                intentNames.push(intentName);
+            });
+        }
+
+        const total = allVariations.length;
+        if (total === 0) return;
+
+        console.log(`[IntentMatcher] Generating embeddings for ${total} variations...`);
+        const BATCH_SIZE = 50; 
+        const allEmbeddings = [];
+
+        for (let i = 0; i < total; i += BATCH_SIZE) {
+            const chunk = allVariations.slice(i, i + BATCH_SIZE);
+            const embeddings = await embeddingService.getEmbeddings(chunk);
+            allEmbeddings.push(...embeddings);
+            
+            const progress = Math.min(100, ((i + chunk.length) / total * 100)).toFixed(1);
+            console.log(`[IntentMatcher] Progress: ${progress}%`);
+            await new Promise(resolve => setTimeout(resolve, 10)); // Yield to CPU
+        }
+
+        const intents = allVariations.map((text, i) => ({
+            intentName: intentNames[i],
+            text,
+            embedding: new Float32Array(allEmbeddings[i])
+        }));
+
+        vectorStore.setKnowledge(intents, vectorStore.entities);
+        console.log(`[IntentMatcher] Successfully regenerated ${intents.length} intents.`);
     }
 }
 

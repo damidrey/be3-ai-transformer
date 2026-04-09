@@ -73,6 +73,15 @@ class VectorStore {
     }
 
     /**
+     * Manually populates the knowledge base (used during regeneration/sync).
+     */
+    setKnowledge(intents, entities) {
+        this.intents = intents || [];
+        this.entities = entities || [];
+        this.isLoaded = true;
+    }
+
+    /**
      * High-speed Cosine Similarity for TypedArrays. 
      * Uses a simple dot product assuming vectors are pre-normalized by the CLIP model.
      */
