@@ -18,26 +18,63 @@ const C = {
 
 async function classify(text) {
     try {
-        const [classResponse, extractResponse] = await Promise.all([
-            axios.post(`${API_URL}/classify`, { text }),
+        const startTime = Date.now();
+        // 1. L1 (Class) + Extract parallel
+        const [l1Resp, extractResponse] = await Promise.all([
+            axios.post(`${API_URL}/classify`, { text, level: 'class' }),
             axios.post(`${API_URL}/extract`, { text })
         ]);
 
-        const { results, duration: classDuration } = classResponse.data;
-        const { entities, confidence: entityScores, duration: extractDuration } = extractResponse.data;
+        const l1 = l1Resp.data;
+        const extractData = extractResponse.data;
+        
+        let l2 = null;
+        let l3 = null;
 
-        // --- 1. DISPLAY INTENTS ---
-        console.log(`\n${C.bold}${C.magenta}--- Classification (${classDuration}) ---${C.reset}`);
-        if (results.length === 0) {
-            console.log(`${C.red}  ✗ No intents found.${C.reset}`);
-        } else {
-            results.forEach((res, i) => {
-                const color = i === 0 ? C.green : (res.score > 0.7 ? C.cyan : C.yellow);
-                const scorePercent = (res.score * 100).toFixed(1);
-                console.log(`${color}${C.bold}  ${i + 1}. ${res.intentName}${C.reset} ${C.dim}(${scorePercent}%)${C.reset}`);
-                console.log(`${C.dim}     Match: "${C.reset}${C.magenta}${res.bestMatch}${C.dim}"${C.reset}`);
-            });
+        // 2. L2 (Intent) if L1 winner exists
+        if (l1.winner) {
+            const l2Resp = await axios.post(`${API_URL}/classify`, { text, level: 'intent', parent: l1.winner });
+            l2 = l2Resp.data;
+
+            // 3. L3 (Sub-Intent) if L2 winner exists
+            if (l2.winner) {
+                const l3Resp = await axios.post(`${API_URL}/classify`, { text, level: 'subintent', parent: l2.winner });
+                l3 = l3Resp.data;
+            }
         }
+
+        const totalDuration = Date.now() - startTime;
+
+        // --- 1. DISPLAY HIERARCHICAL INTENTS ---
+        console.log(`\n${C.bold}${C.magenta}--- Classification Hierarchy (${totalDuration}ms) ---${C.reset}`);
+        
+        const printLevel = (label, data) => {
+            if (!data || !data.scores || data.scores.length === 0) return;
+            const top = data.scores[0];
+            const scorePercent = (top.score * 100).toFixed(1);
+            const color = top.score > 0.7 ? C.green : (top.score > 0.4 ? C.cyan : C.yellow);
+            console.log(`${color}${C.bold}  ▶ ${label}: ${top.name}${C.reset} ${C.dim}(${scorePercent}%)${C.reset}`);
+            console.log(`${C.dim}     Match: "${C.reset}${C.magenta}${top.bestMatch}${C.dim}"${C.reset}`);
+        };
+
+        if (!l1.scores || l1.scores.length === 0) {
+            console.log(`${C.red}  ✗ No class found.${C.reset}`);
+        } else {
+            console.log(`${C.bold}${C.white}  L1 Class Candidates:${C.reset}`);
+            l1.scores.forEach((res, i) => {
+                const color = i === 0 ? C.green : (res.score > 0.7 ? C.cyan : (res.score > 0.4 ? C.yellow : C.red));
+                const scorePercent = (res.score * 100).toFixed(1);
+                console.log(`    ${color}${i + 1}. ${res.name}${C.reset} ${C.dim}(${scorePercent}%) - Match: "${res.bestMatch}"${C.reset}`);
+            });
+            console.log('');
+            
+            // Print the chosen hierarchy ladder
+            printLevel('🏆 L1 Winner', l1);
+            if (l2) printLevel('↳ L2 Intent', l2);
+            if (l3) printLevel('↳ L3 Sub-Intent', l3);
+        }
+
+        const { entities, confidence: entityScores, duration: extractDuration } = extractData;
 
         // --- 2. DISPLAY ENTITIES ---
         console.log(`\n${C.bold}${C.cyan}--- Entities (${extractDuration}) ---${C.reset}`);

@@ -4,6 +4,10 @@ import dataLoader from './dataLoader.js';
 
 /**
  * Service for matching human text against pre-defined intents using vector similarity.
+ * 
+ * Supports two modes:
+ *   1. Legacy (flat match) — match() against all intents in the flat pool
+ *   2. Hierarchical match — matchByLevel() against a specific level/parent pool
  */
 class IntentMatcher {
     constructor() {
@@ -31,6 +35,7 @@ class IntentMatcher {
 
     /**
      * Matches a query string against the optimized intent variations in the VectorStore.
+     * (Legacy — used by /analyze endpoint)
      * @param {string} query 
      * @param {number} topK 
      */
@@ -48,6 +53,41 @@ class IntentMatcher {
 
         // 3. Match against VectorStore
         return vectorStore.matchIntents(queryEmbedding, topK);
+    }
+
+    // ═══════════════════════════════════════════════
+    // Hierarchical matching (Phase 2: micarch)
+    // ═══════════════════════════════════════════════
+
+    /**
+     * Classify a query against a specific hierarchical level.
+     * @param {string} query - User text
+     * @param {'class'|'intent'|'subintent'} level - Hierarchy level
+     * @param {string|null} parent - Parent context (null for class, class name for intent, etc.)
+     * @param {number} topK
+     * @returns {Object} { level, parent, winner, scores: [{ name, score, bestMatch }] }
+     */
+    async matchByLevel(query, level, parent = null, topK = 5) {
+        if (!query) return { level, parent, winner: null, scores: [] };
+
+        // 1. Ensure hierarchical pools are loaded
+        if (!vectorStore.isHierarchicalLoaded) {
+            await vectorStore.initHierarchical();
+        }
+
+        // 2. Generate embedding for query
+        const [queryEmbeddingRaw] = await embeddingService.getEmbeddings([query]);
+        const queryEmbedding = new Float32Array(queryEmbeddingRaw);
+
+        // 3. Match against the specific pool
+        const scores = await vectorStore.matchPool(queryEmbedding, level, parent, topK);
+
+        return {
+            level,
+            parent,
+            winner: scores.length > 0 ? scores[0].name : null,
+            scores
+        };
     }
 
     async regenerate(options = {}) {

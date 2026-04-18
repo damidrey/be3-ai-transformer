@@ -1,0 +1,6 @@
+{
+  "level": "subintent", "parent": "Platform_Feedback",
+  "candidates": {
+    "give_feedback": { "variations": ["i want to give feedback", "i have a complaint", "i want to leave a review", "this is great", "something is wrong", "i want to report a bug", "your service needs improvement", "i have a suggestion", "let me share my experience", "i want to rate this", "this app has issues", "great job", "i'm not happy with the service", "i want to report an issue", "here's my feedback"] }
+  }
+}

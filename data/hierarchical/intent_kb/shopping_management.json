@@ -1,0 +1,83 @@
+{
+  "level": "intent",
+  "parent": "Shopping_Management",
+  "candidates": {
+    "Cart_Management": {
+      "variations": [
+        "add this to my cart",
+        "put it in my cart",
+        "i want to buy this one",
+        "add the first one",
+        "remove that from my cart",
+        "take this out of my cart",
+        "delete from cart",
+        "change the quantity",
+        "i want 3 of these instead",
+        "update the amount in my cart",
+        "show me my cart",
+        "what's in my cart",
+        "let me see what i have in my cart",
+        "view cart contents",
+        "how much is in my cart",
+        "i want more of these",
+        "reduce the quantity",
+        "add another one",
+        "what did i add to cart",
+        "remove everything from my cart",
+        "clear my cart",
+        "add all of these to cart",
+        "put the second one in my cart",
+        "take out the last item",
+        "how many items are in my cart"
+      ]
+    },
+    "Checkout_Flow": {
+      "variations": [
+        "i want to checkout",
+        "proceed to payment",
+        "ready to place my order",
+        "let me pay now",
+        "start checkout process",
+        "set my delivery address",
+        "change shipping address",
+        "deliver to my home",
+        "confirm my order",
+        "yes place the order",
+        "go ahead and order",
+        "is this available for delivery",
+        "can you deliver to my area",
+        "check if this is in stock",
+        "finalize my purchase",
+        "i want to pay",
+        "submit my order",
+        "complete my purchase",
+        "set delivery method",
+        "how long will delivery take"
+      ]
+    },
+    "Post_Purchase": {
+      "variations": [
+        "where is my order",
+        "track my delivery",
+        "check my order status",
+        "when will my order arrive",
+        "show me my previous orders",
+        "list my order history",
+        "what did i order before",
+        "i want to cancel my order",
+        "cancel order number 123",
+        "can i return this item",
+        "i want a refund",
+        "how do i return something",
+        "my order hasn't arrived",
+        "what happened to my delivery",
+        "show me my past purchases",
+        "i need to cancel something i ordered",
+        "return this product please",
+        "is my order on the way",
+        "when was my last order",
+        "i want to see my receipts"
+      ]
+    }
+  }
+}

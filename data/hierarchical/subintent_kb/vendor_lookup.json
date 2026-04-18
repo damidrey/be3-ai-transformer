@@ -1,0 +1,9 @@
+{
+  "level": "subintent",
+  "parent": "Vendor_Lookup",
+  "candidates": {
+    "list_vendors": { "variations": ["list all vendors", "show me all sellers", "which shops are available", "show me your merchants", "list your sellers", "who sells on your platform", "show me all shops", "what vendors do you have", "list all merchants", "show me the sellers", "how many vendors do you have", "display all shops", "who are your sellers", "show me vendor list", "all available vendors"] },
+    "vendor_info": { "variations": ["tell me about this vendor", "vendor information", "give me details about this seller", "what do you know about this shop", "show me vendor details", "info about this merchant", "who is this vendor", "tell me about this shop", "vendor profile", "show me this seller's info", "details about this merchant", "what's this vendor about", "vendor description", "give me seller info", "about this shop"] },
+    "vendor_identity": { "variations": ["who sells this product", "which vendor has this", "who is the seller", "who makes this", "which shop sells this item", "who supplies this product", "who is selling this", "find the vendor for this", "which seller carries this", "identify the vendor", "who's the merchant for this", "which shop has this", "tell me who sells this", "who provides this item", "find me the seller of this"] }
+  }
+}

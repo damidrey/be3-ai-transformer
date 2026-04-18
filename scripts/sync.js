@@ -25,25 +25,7 @@ async function sync() {
     // This allows the transformer to be portable even without be3_ai access
     console.log('[Sync] Phase 1: Snapping raw data files...');
     try {
-        const be3AiIntents = path.join(dataLoader.be3AiBase, 'src/services/intentResolver/semanticLab/intents');
-        if (fs.existsSync(be3AiIntents)) {
-            const destIntents = path.join(DATA_DIR, 'intents');
-            if (fs.existsSync(destIntents)) fs.rmSync(destIntents, { recursive: true });
-            fs.mkdirSync(destIntents, { recursive: true });
-            
-            // Shallow copy of directories containing bench.json
-            const items = fs.readdirSync(be3AiIntents);
-            for (const item of items) {
-                const src = path.join(be3AiIntents, item);
-                const bench = path.join(src, 'bench.json');
-                if (fs.existsSync(bench)) {
-                    const dest = path.join(destIntents, item);
-                    fs.mkdirSync(dest, { recursive: true });
-                    fs.copyFileSync(bench, path.join(dest, 'bench.json'));
-                }
-            }
-            console.log('✅ Intents snapped.');
-        }
+
 
         if (fs.existsSync(dataLoader.storeContextPath)) {
             fs.copyFileSync(dataLoader.storeContextPath, path.join(DATA_DIR, 'storeContext.js'));
@@ -59,7 +41,6 @@ async function sync() {
     
     try {
         await Promise.all([
-            intentMatcher.reload({ skipCache: true }),
             entityExtractor.reload({ skipCache: true })
         ]);
 
@@ -68,8 +49,7 @@ async function sync() {
             version: '1.0.0',
             generatedAt: new Date().toISOString(),
             model: embeddingService.getConfig().key,
-            modelName: embeddingService.getConfig().modelName,
-            intents: intentMatcher.intentEmbeddings,
+            intents: [], // Legacy flat intents deprecated
             entities: entityExtractor.entityEmbeddings
         };
 
@@ -77,7 +57,6 @@ async function sync() {
         
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         console.log(`\n✨ [Sync] SUCCESS!`);
-        console.log(`- Intents: ${cacheData.intents.length}`);
         console.log(`- Entities: ${cacheData.entities.length}`);
         console.log(`- Model: ${cacheData.modelName}`);
         console.log(`- Cache saved to: ${CACHE_FILE}`);

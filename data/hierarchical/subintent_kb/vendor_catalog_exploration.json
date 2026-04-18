@@ -1,0 +1,8 @@
+{
+  "level": "subintent",
+  "parent": "Vendor_Catalog_Exploration",
+  "candidates": {
+    "vendor_products": { "variations": ["show me products from this vendor", "what does this seller sell", "browse this vendor's items", "show me what this shop has", "list products by this seller", "what's available from this vendor", "show me this merchant's catalog", "products from this shop", "what items does this vendor carry", "browse vendor catalog", "show me everything this seller has", "this vendor's products", "list items from this shop", "what does this merchant offer", "show me their inventory"] },
+    "vendor_facet": { "variations": ["what categories does this vendor have", "show me this vendor's departments", "what types of products does this seller have", "filter by this vendor's categories", "what sections does this shop have", "show me the vendor's product types", "list this seller's categories", "what kinds of products does this vendor sell", "browse this vendor's categories", "show me what departments this shop covers", "vendor category list", "what areas does this seller cover", "this vendor's product categories", "filter this vendor's products", "show me sections from this seller"] }
+  }
+}

@@ -7,6 +7,7 @@ import entityExtractor from './services/entityExtractor.js';
 import embeddingService from './services/embeddingService.js';
 import vectorStore from './services/vectorStore.js';
 import { listModelConfigs } from './services/modelRegistry.js';
+import aliasService from './services/aliasService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3009;
@@ -35,19 +36,51 @@ app.get('/health', (req, res) => {
 /**
  * Endpoint: Classify Text
  * POST /classify
- * Body: { "text": "I want to buy a laptop" }
+ * 
+ * Legacy mode (flat classification):
+ *   Body: { "text": "I want to buy a laptop" }
+ * 
+ * Hierarchical mode (level-specific classification):
+ *   Body: { "text": "I want to buy a laptop", "level": "class" }
+ *   Body: { "text": "I want to buy a laptop", "level": "intent", "parent": "Shopping_Management" }
+ *   Body: { "text": "I want to buy a laptop", "level": "subintent", "parent": "Cart_Management" }
  */
 app.post('/classify', async (req, res) => {
-    const { text } = req.body;
+    const { text, level, parent } = req.body;
 
     if (!text) {
         return res.status(400).json({ error: 'Text field is required' });
     }
 
     try {
-        console.log(`[API] Classifying: "${text}"`);
         const startTime = Date.now();
-        const results = await intentMatcher.match(text);
+
+        const normalizedText = aliasService.normalize(text);
+
+        // Hierarchical mode: level is provided
+        if (level) {
+            const validLevels = ['class', 'intent', 'subintent'];
+            if (!validLevels.includes(level)) {
+                return res.status(400).json({ error: `Invalid level. Must be one of: ${validLevels.join(', ')}` });
+            }
+            if (level !== 'class' && !parent) {
+                return res.status(400).json({ error: `'parent' is required for level '${level}'` });
+            }
+
+            console.log(`[API] Hierarchical classify: "${normalizedText}" | level=${level} | parent=${parent || 'ROOT'}`);
+            const result = await intentMatcher.matchByLevel(normalizedText, level, parent);
+            const duration = Date.now() - startTime;
+
+            return res.json({
+                text,
+                ...result,
+                duration: `${duration}ms`
+            });
+        }
+
+        // Legacy mode: flat classification against all intents
+        console.log(`[API] Classifying (legacy): "${normalizedText}"`);
+        const results = await intentMatcher.match(normalizedText);
         const duration = Date.now() - startTime;
 
         res.json({
@@ -74,9 +107,10 @@ app.post('/extract', async (req, res) => {
     }
 
     try {
-        console.log(`[API] Extracting entities from: "${text}"`);
+        const normalizedText = aliasService.normalize(text);
+        console.log(`[API] Extracting entities from: "${normalizedText}"`);
         const startTime = Date.now();
-        const results = await entityExtractor.extract(text);
+        const results = await entityExtractor.extract(normalizedText);
         const duration = Date.now() - startTime;
 
         res.json({
@@ -90,50 +124,7 @@ app.post('/extract', async (req, res) => {
     }
 });
 
-/**
- * Endpoint: Unified Analysis (Classification + Entity Extraction)
- * POST /analyze
- * Body: { "text": "show me cheap samsung phones" }
- * 
- * Runs both classification and entity extraction in parallel.
- * Returns a single structured response for the pipeline to consume early.
- */
-app.post('/analyze', async (req, res) => {
-    const { text, texts } = req.body;
-    const inputTexts = texts || (text ? [text] : null);
 
-    if (!inputTexts || !Array.isArray(inputTexts)) {
-        return res.status(400).json({ error: 'Text or texts (array) field is required' });
-    }
-
-    try {
-        const startTime = Date.now();
-        console.log(`[API] Analyzing ${inputTexts.length} statements...`);
-
-        const results = await Promise.all(inputTexts.map(async (t) => {
-            const [classificationResults, extractionResults] = await Promise.all([
-                intentMatcher.match(t),
-                entityExtractor.extract(t)
-            ]);
-            return {
-                text: t,
-                classification: classificationResults,
-                entities: extractionResults.entities,
-                confidence: extractionResults.confidence
-            };
-        }));
-
-        const duration = Date.now() - startTime;
-
-        res.json({
-            results,
-            duration: `${duration}ms`
-        });
-    } catch (err) {
-        console.error('[API] Analysis error:', err);
-        res.status(500).json({ error: 'Internal server error', details: err.message });
-    }
-});
 
 /**
  * Endpoint: Generate Embeddings
@@ -288,23 +279,30 @@ const server = app.listen(PORT, async () => {
     const pruneEnabled = args.includes('--prune');
     const pruneThreshold = args.find(a => a.startsWith('--threshold='))?.split('=')[1] || 0.15;
 
-    // Unified Memory-Efficient Startup
+    // Entity Extractor Memory-Efficient Startup
     try {
-        console.log(`\n[Server] 🏁 Starting unified knowledge base initialization...`);
+        console.log(`\n[Server] 🏁 Starting Entity Store initialization...`);
         await vectorStore.init({ 
             prune: pruneEnabled ? parseFloat(pruneThreshold) : false 
         });
         
-        // Matchers and Extractors now lazily consume the unified VectorStore.
-        console.log(`[Server] ✅ Knowledge base ready (RAM optimized).`);
+        console.log(`[Server] ✅ Entity extraction cache ready (RAM optimized).`);
     } catch (err) {
-        console.error('❌ Failed to load knowledge base during startup:', err);
+        console.error('❌ Failed to load Entity extraction cache during startup:', err);
     }
+
+    // Load hierarchical pools (Phase 2: micarch)
+    try {
+        await vectorStore.initHierarchical();
+    } catch (err) {
+        console.warn('[Server] ⚠️  Hierarchical pools not loaded (may need generation):', err.message);
+    }
+
 
     // Set up periodic auto-reload (every 30 minutes)
     const RELOAD_INTERVAL = 30 * 60 * 1000;
     setInterval(async () => {
-        console.log(`\n[Auto-Reload] 🔄 Triggering periodic knowledge base update...`);
+        console.log(`\n[Auto-Reload] 🔄 Triggering periodic Entity Store update...`);
         try {
             await vectorStore.init({ 
                 prune: pruneEnabled ? parseFloat(pruneThreshold) : false 

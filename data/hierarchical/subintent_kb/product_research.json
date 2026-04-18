@@ -1,0 +1,108 @@
+{
+  "level": "subintent",
+  "parent": "Product_Research",
+  "candidates": {
+    "product_search": {
+      "variations": [
+        "show me phones",
+        "search for laptops",
+        "find me headphones",
+        "do you have shoes",
+        "i want to buy a new phone",
+        "what laptops are available",
+        "show me cheap options",
+        "find me something under $50",
+        "i need a new charger",
+        "search for samsung products",
+        "show me what you have in electronics",
+        "looking for a dress",
+        "find me something for my kitchen",
+        "show me affordable options",
+        "i want to see your phones",
+        "what do you have on sale",
+        "search for wireless earbuds"
+      ]
+    },
+    "browse_categories": {
+      "variations": [
+        "what categories do you have",
+        "show me your departments",
+        "list all categories",
+        "what sections do you have",
+        "what do you sell",
+        "show me all departments",
+        "what types of products do you carry",
+        "list your product categories",
+        "what kinds of things do you have",
+        "show me the main sections",
+        "what are your categories",
+        "browse categories",
+        "show me your product types",
+        "what areas can i browse",
+        "give me a list of departments"
+      ]
+    },
+    "browse_collection": {
+      "variations": [
+        "show me new arrivals",
+        "what's trending",
+        "show me best sellers",
+        "what's popular right now",
+        "latest products",
+        "show me featured items",
+        "what's new in your store",
+        "top picks for today",
+        "show me the collection",
+        "fresh drops",
+        "what's hot right now",
+        "newest items available",
+        "show me curated picks",
+        "most popular products",
+        "show me your top rated items"
+      ]
+    },
+    "facet_list": {
+      "variations": [
+        "what colors are available",
+        "show me the storage options",
+        "what sizes do you have",
+        "which brands are available",
+        "what versions are there",
+        "list available colors",
+        "what storage sizes come with this",
+        "show me the available options",
+        "what variations exist",
+        "which configurations are available",
+        "what materials can i choose from",
+        "show me the size options",
+        "what colors does this come in",
+        "list the available brands",
+        "what options do i have for this"
+      ]
+    },
+    "get_advice": {
+      "variations": [
+        "what should i buy",
+        "give me advice",
+        "recommend something",
+        "what do you suggest",
+        "help me choose",
+        "which one is best for me",
+        "what would you recommend",
+        "suggest a product for me",
+        "i need your opinion",
+        "what's the best option",
+        "advise me on what to get",
+        "which should i pick",
+        "help me decide",
+        "what's good for a gift",
+        "recommend something under $50",
+        "help me find a gift",
+        "help me find a good laptop",
+        "what is a good phone",
+        "what are the best products",
+        "recommend a good laptop for me"
+      ]
+    }
+  }
+}

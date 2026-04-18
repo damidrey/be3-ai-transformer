@@ -1,0 +1,6 @@
+{
+  "level": "subintent", "parent": "Assistance_Request",
+  "candidates": {
+    "get_help": { "variations": ["i need help", "how do i use this", "i have a question", "i don't understand", "can you help me", "how does this work", "i'm stuck", "what do i do", "help me with this", "i need assistance", "how do i do this", "explain this to me", "i'm having trouble", "something's not working", "guide me through this"] }
+  }
+}

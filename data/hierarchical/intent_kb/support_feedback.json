@@ -1,0 +1,39 @@
+{
+  "level": "intent",
+  "parent": "Support_Feedback",
+  "candidates": {
+    "Assistance_Request": {
+      "variations": [
+        "i need help",
+        "can you help me",
+        "how do i use this",
+        "i have a question",
+        "help me figure this out",
+        "i don't understand",
+        "can you guide me",
+        "i'm confused about something",
+        "can you explain how this works",
+        "i need some guidance"
+      ]
+    },
+    "Platform_Feedback": {
+      "variations": [
+        "i want to give feedback",
+        "i have a complaint",
+        "i want to leave a review",
+        "this service is great",
+        "something is wrong with your app",
+        "i want to report an issue",
+        "your website has a bug",
+        "i want to share my experience",
+        "this platform needs improvement",
+        "great job on the service",
+        "i have a suggestion for you",
+        "the app keeps crashing",
+        "your service could be better",
+        "i want to rate my experience",
+        "let me give you some feedback"
+      ]
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "level": "class",
+  "candidates": {
+    "Discovery": {
+      "variations": [
+        "search the product catalog",
+        "browse store items",
+        "find specific products",
+        "explore categories",
+        "discover new products",
+        "get shopping advice",
+        "recommend some products",
+        "list the collection",
+        "view item details",
+        "looking for specific items",
+        "get product details",
+        "tell me about the product"
+      ]
+    },
+    "Shopping_Management": {
+      "variations": [
+        "shopping cart actions",
+        "add items to cart",
+        "proceed to checkout",
+        "make payment for order",
+        "select a specific item",
+        "pick an item from the list",
+        "manage shopping cart",
+        "track order delivery",
+        "check shipment status",
+        "cancel my order purchase",
+        "return a purchased item",
+        "update cart quantity"
+      ]
+    },
+    "Vendor_Intelligence": {
+      "variations": [
+        "seller personal profile",
+        "merchant profile details",
+        "merchant business summary",
+        "seller verification details",
+        "merchant product catalog search",
+        "list of all available vendors",
+        "browsing marketplace vendors"
+      ]
+    },
+    "Support_Feedback": {
+      "variations": [
+        "request customer help",
+        "ask support a question",
+        "give platform feedback",
+        "report a technical problem",
+        "customer support service",
+        "how to use this app",
+        "talk to support team",
+        "resolve a site error",
+        "report a broken feature"
+      ]
+    }
+  }
+}

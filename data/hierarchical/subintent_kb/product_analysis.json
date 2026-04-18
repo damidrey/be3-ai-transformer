@@ -1,0 +1,66 @@
+{
+  "level": "subintent",
+  "parent": "Product_Analysis",
+  "candidates": {
+    "get_product_details": {
+      "variations": [
+        "tell me more about this",
+        "show me the details",
+        "what are the specs",
+        "give me product information",
+        "describe this product",
+        "what features does this have",
+        "i want more info on this",
+        "show me the full description",
+        "what's included with this product",
+        "give me the breakdown",
+        "tell me about this item",
+        "what are the specifications",
+        "show me everything about this",
+        "product details please",
+        "what do i need to know about this",
+        "tell me about the first one",
+        "give me details on the second item",
+        "what can you tell me about the first product"
+      ]
+    },
+    "product_compare": {
+      "variations": [
+        "compare these two",
+        "what's the difference between these",
+        "which one is better",
+        "compare the prices",
+        "put these side by side",
+        "how do these compare",
+        "compare features",
+        "which should i pick",
+        "show me a comparison",
+        "compare the first and second one",
+        "what are the differences",
+        "which one has better specs",
+        "compare these products for me",
+        "help me decide between these",
+        "which one do you recommend between the two"
+      ]
+    },
+    "product_similar": {
+      "variations": [
+        "show me similar products",
+        "find me something like this",
+        "anything similar to this",
+        "show me alternatives",
+        "what else is like this one",
+        "find products like this",
+        "show me related items",
+        "is there anything similar but cheaper",
+        "more like this one",
+        "products that are similar",
+        "show me comparable items",
+        "anything else like this",
+        "find me an alternative",
+        "what options are similar to this",
+        "show me other products in this range"
+      ]
+    }
+  }
+}

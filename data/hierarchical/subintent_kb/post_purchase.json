@@ -1,0 +1,10 @@
+{
+  "level": "subintent",
+  "parent": "Post_Purchase",
+  "candidates": {
+    "order_status": { "variations": ["where is my order", "track my delivery", "check order status", "when will it arrive", "has my order shipped", "what's the status of my order", "track my package", "is my order on the way", "when will my delivery come", "where's my package", "how far is my delivery", "order tracking", "check my delivery status", "when was it shipped", "is it out for delivery"] },
+    "list_orders": { "variations": ["show me my orders", "list my previous orders", "order history", "what did i order before", "show me past purchases", "my order history", "show all my orders", "list my receipts", "what have i bought", "show me what i ordered", "previous orders", "my purchase history", "list past orders", "show me my transactions", "what orders do i have"] },
+    "cancel_order": { "variations": ["cancel my order", "i want to cancel", "cancel order number 123", "stop my order", "don't deliver this", "i changed my mind cancel it", "please cancel my order", "can i cancel this", "i need to cancel", "undo my order", "cancel the last order", "i don't want this order anymore", "cancel purchase", "stop the delivery", "revoke my order"] },
+    "return_item": { "variations": ["i want to return this", "how do i return", "return this product", "i need a refund", "this item is defective", "i want my money back", "return and refund", "i received the wrong item", "i want to send this back", "how does your return policy work", "initiate a return", "this is damaged i want to return it", "process my return", "i need to return something", "can i get a replacement"] }
+  }
+}

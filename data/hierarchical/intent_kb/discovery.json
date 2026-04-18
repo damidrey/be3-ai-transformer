@@ -1,0 +1,64 @@
+{
+  "level": "intent",
+  "parent": "Discovery",
+  "candidates": {
+    "Product_Research": {
+      "variations": [
+        "show me products",
+        "i want to search for something",
+        "find me phones",
+        "what laptops do you have",
+        "search for headphones",
+        "browse your products",
+        "do you have any shoes",
+        "help me find a gift",
+        "let me see what you sell",
+        "what categories are available",
+        "show me your departments",
+        "i want to see new arrivals",
+        "what's trending right now",
+        "what options do you have for me",
+        "filter products by price",
+        "show me cheap options",
+        "list your product categories",
+        "what colors are available",
+        "show me storage options",
+        "what sizes do you carry",
+        "i need to browse around",
+        "display available items",
+        "what's in stock today",
+        "show me the latest collection",
+        "what do you recommend under $100"
+      ]
+    },
+    "Product_Analysis": {
+      "variations": [
+        "tell me more about this product",
+        "give me details on this item",
+        "compare these two products",
+        "show me something similar",
+        "what are the specs of this",
+        "how does this product compare",
+        "i want to see product details",
+        "show me the specifications",
+        "compare the prices of these",
+        "find me products like this one",
+        "what's the difference between these",
+        "give me a product comparison",
+        "show me alternatives to this",
+        "i want more info about this",
+        "describe this product to me",
+        "what are the features of this",
+        "show me items similar to this",
+        "how is this different from that one",
+        "is there anything like this but cheaper",
+        "tell me about this specific item",
+        "what makes this product special",
+        "compare features side by side",
+        "show me related products",
+        "find similar items to what i saw",
+        "give me the full breakdown of this product"
+      ]
+    }
+  }
+}

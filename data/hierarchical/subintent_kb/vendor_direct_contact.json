@@ -1,0 +1,6 @@
+{
+  "level": "subintent", "parent": "Vendor_Direct_Contact",
+  "candidates": {
+    "vendor_contact": { "variations": ["i want to contact this vendor", "how do i reach the seller", "give me vendor contact info", "how can i message this seller", "connect me with the merchant", "i need to speak to the vendor", "what's the seller's phone number", "how do i call this vendor", "contact this seller for me", "i want to chat with the vendor", "get me the vendor's email", "put me in touch with the seller", "contact information please", "i need the vendor's number", "how do i reach this shop"] }
+  }
+}

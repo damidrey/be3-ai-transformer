@@ -1,0 +1,10 @@
+{
+  "level": "subintent",
+  "parent": "Checkout_Flow",
+  "candidates": {
+    "start_checkout": { "variations": ["i want to checkout", "proceed to payment", "ready to place order", "take me to checkout", "let me pay now", "start checkout", "finalize purchase", "i want to pay", "submit my order", "complete my purchase", "go to checkout", "time to pay", "i'm ready to buy", "process my order", "let me check out"] },
+    "set_delivery": { "variations": ["set my delivery address", "change shipping address", "deliver to my home", "update delivery info", "i want home delivery", "set delivery method", "change where you deliver", "ship it to this address", "deliver to my office", "update shipping info", "set up delivery", "where should you deliver", "change delivery location", "i need to update my address", "use a different shipping address"] },
+    "confirm_order": { "variations": ["confirm my order", "yes place the order", "go ahead and order it", "yes i confirm", "order confirmed", "proceed with the order", "yes that's correct", "confirm purchase", "yes buy it", "place my order now", "i approve this order", "finalize it", "yes go ahead", "confirm everything", "that's right place it"] },
+    "check_availability": { "variations": ["is this available", "check if it's in stock", "can you deliver to my area", "is this product available", "do you have this in stock", "check availability", "is it available for delivery", "can i get this delivered", "when will this be available", "is this still in stock", "do you ship to my location", "check if this is available", "is there stock left", "can i order this now", "is delivery available here"] }
+  }
+}

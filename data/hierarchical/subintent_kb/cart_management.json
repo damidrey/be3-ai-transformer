@@ -1,0 +1,82 @@
+{
+  "level": "subintent",
+  "parent": "Cart_Management",
+  "candidates": {
+    "add_to_cart": {
+      "variations": [
+        "add this to my cart",
+        "put it in my cart",
+        "i want to buy this",
+        "add the first one",
+        "buy this product",
+        "i'll take this one",
+        "add it to cart",
+        "put this in my cart please",
+        "i want this one",
+        "add the second item to cart",
+        "give me one of these",
+        "i'd like to purchase this",
+        "add all of them to my cart",
+        "put both in my cart",
+        "i want to get this"
+      ]
+    },
+    "remove_from_cart": {
+      "variations": [
+        "remove this from my cart",
+        "take it out of my cart",
+        "delete this from cart",
+        "i don't want this anymore",
+        "remove the first item",
+        "take that out",
+        "get rid of this from my cart",
+        "remove the last one i added",
+        "i changed my mind, remove it",
+        "delete the second item",
+        "take this out of my cart",
+        "remove all items from cart",
+        "clear my cart",
+        "i want to remove something",
+        "get this out of my cart"
+      ]
+    },
+    "update_cart_quantity": {
+      "variations": [
+        "change the quantity",
+        "i want 3 of these instead",
+        "update the amount",
+        "increase the quantity",
+        "reduce it to 1",
+        "make it 5 pieces",
+        "change it to 2",
+        "i need more of these",
+        "add one more",
+        "decrease the quantity",
+        "change from 3 to 1",
+        "i want less of these",
+        "update to 10 pieces",
+        "adjust the quantity please",
+        "set the amount to 4"
+      ]
+    },
+    "view_cart": {
+      "variations": [
+        "show me my cart",
+        "what's in my cart",
+        "view my cart",
+        "let me see my cart",
+        "open my shopping cart",
+        "what did i add",
+        "show cart contents",
+        "how many items in my cart",
+        "cart summary",
+        "what have i added so far",
+        "show me what i'm buying",
+        "let me check my cart",
+        "review my cart",
+        "display my cart",
+        "what's in my shopping cart"
+      ]
+    }
+  }
+}

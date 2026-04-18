@@ -1,0 +1,70 @@
+{
+  "level": "intent",
+  "parent": "Vendor_Intelligence",
+  "candidates": {
+    "Vendor_Lookup": {
+      "variations": [
+        "who sells this",
+        "list all vendors",
+        "show me your sellers",
+        "which shops are available",
+        "tell me about this vendor",
+        "who is this seller",
+        "give me vendor info",
+        "which merchants do you have",
+        "list your shops",
+        "show me all sellers on your platform",
+        "browsing our marketplace vendors",
+        "search according to vendors",
+        "who provides this item",
+        "tell me about this merchant",
+        "is this vendor verified",
+        "show me vendor ratings",
+        "who are your registered vendors",
+        "which seller is this from",
+        "tell me about this shop",
+        "what do you know about this vendor",
+        "give me details about this seller",
+        "who supplies this from your vendors"
+      ]
+    },
+    "Vendor_Catalog_Exploration": {
+      "variations": [
+        "show me products from this vendor",
+        "what does this seller sell",
+        "browse this vendor's catalog",
+        "show me items from this shop",
+        "what products does this merchant have",
+        "list products by this vendor",
+        "show me what this seller offers",
+        "browse items from this seller",
+        "what categories does this vendor have",
+        "show me everything from this shop",
+        "what does this seller have in stock",
+        "filter products from this vendor",
+        "show me this vendor's phones",
+        "what options does this seller have",
+        "browse this shop's inventory"
+      ]
+    },
+    "Vendor_Direct_Contact": {
+      "variations": [
+        "i want to contact this vendor",
+        "how do i reach this seller",
+        "give me the vendor's phone number",
+        "how can i message this seller",
+        "connect me with the merchant",
+        "i need to speak to the vendor",
+        "what's the seller's contact info",
+        "how do i call this vendor",
+        "send a message to this seller",
+        "i want to chat with the vendor",
+        "get me the vendor's email",
+        "how do i reach this shop owner",
+        "contact information for this seller",
+        "i want to talk to the merchant",
+        "put me in touch with the vendor"
+      ]
+    }
+  }
+}
