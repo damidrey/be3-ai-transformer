@@ -102,25 +102,33 @@ async function classify(text) {
             return score ? `${C.dim}(${(score * 100).toFixed(1)}%)${C.reset}` : '';
         };
 
-        if (entities.category?.length > 0) {
+        const categories = Object.entries(entities.category || {});
+        if (categories.length > 0) {
             entityFound = true;
             console.log(`${C.white}${C.bold}  Categories:${C.reset}`);
-            entities.category.forEach(c => {
-                console.log(`    ${C.green}• ${c}${C.reset} ${getScore(`category:${c}`)}`);
+            categories.forEach(([c, segments]) => {
+                const segsInfo = segments.length > 0 ? ` ${C.dim}[matched: "${segments.join('", "')}"]${C.reset}` : '';
+                console.log(`    ${C.green}• ${c}${C.reset} ${getScore(`category:${c}`)}${segsInfo}`);
             });
         }
-        if (entities.vendor?.length > 0) {
+
+        const vendors = Object.entries(entities.vendor || {});
+        if (vendors.length > 0) {
             entityFound = true;
             console.log(`${C.white}${C.bold}  Vendors:${C.reset}`);
-            entities.vendor.forEach(v => {
-                console.log(`    ${C.yellow}• ${v}${C.reset} ${getScore(`vendor:${v}`)}`);
+            vendors.forEach(([v, segments]) => {
+                const segsInfo = segments.length > 0 ? ` ${C.dim}[matched: "${segments.join('", "')}"]${C.reset}` : '';
+                console.log(`    ${C.yellow}• ${v}${C.reset} ${getScore(`vendor:${v}`)}${segsInfo}`);
             });
         }
-        if (entities.clause?.length > 0) {
+
+        const clauses = Object.entries(entities.clause || {});
+        if (clauses.length > 0) {
             entityFound = true;
             console.log(`${C.white}${C.bold}  Clauses:${C.reset}`);
-            entities.clause.forEach(cl => {
-                console.log(`    ${C.magenta}• ${cl}${C.reset} ${getScore(`clause:${cl}`)}`);
+            clauses.forEach(([cl, segments]) => {
+                const segsInfo = segments.length > 0 ? ` ${C.dim}[matched: "${segments.join('", "')}"]${C.reset}` : '';
+                console.log(`    ${C.magenta}• ${cl}${C.reset} ${getScore(`clause:${cl}`)}${segsInfo}`);
             });
         }
         if (entities.attribute && Object.keys(entities.attribute).length > 0) {

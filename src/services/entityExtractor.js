@@ -67,10 +67,10 @@ class EntityExtractor {
         const segmentEmbeddings = segmentEmbeddingsRaw.map(v => new Float32Array(v));
 
         const results = {
-            category: new Set(),
-            vendor: new Set(),
-            clause: new Set(),
-            attribute: {} // subType -> [values]
+            category: {}, // key -> [segments]
+            vendor: {},   // key -> [segments]
+            clause: {},   // key -> [segments]
+            attribute: {} // subType -> [segments]
         };
         const confidence = {};
 
@@ -88,9 +88,18 @@ class EntityExtractor {
                 const score = hit.score;
                 const confidenceKey = (type === 'attribute') ? segment : key;
 
-                if (type === 'category') results.category.add(key);
-                if (type === 'vendor') results.vendor.add(key);
-                if (type === 'clause') results.clause.add(key);
+                if (type === 'category') {
+                    if (!results.category[key]) results.category[key] = new Set();
+                    results.category[key].add(segment);
+                }
+                if (type === 'vendor') {
+                    if (!results.vendor[key]) results.vendor[key] = new Set();
+                    results.vendor[key].add(segment);
+                }
+                if (type === 'clause') {
+                    if (!results.clause[key]) results.clause[key] = new Set();
+                    results.clause[key].add(segment);
+                }
                 if (type === 'attribute') {
                     if (!results.attribute[hit.subType]) results.attribute[hit.subType] = new Set();
                     results.attribute[hit.subType].add(segment);
@@ -105,12 +114,10 @@ class EntityExtractor {
 
         return {
             entities: {
-                category: Array.from(results.category),
-                vendor: Array.from(results.vendor),
-                clause: Array.from(results.clause),
-                attribute: Object.fromEntries(
-                    Object.entries(results.attribute).map(([k, v]) => [k, Array.from(v)])
-                )
+                category: Object.fromEntries(Object.entries(results.category).map(([k, v]) => [k, Array.from(v)])),
+                vendor: Object.fromEntries(Object.entries(results.vendor).map(([k, v]) => [k, Array.from(v)])),
+                clause: Object.fromEntries(Object.entries(results.clause).map(([k, v]) => [k, Array.from(v)])),
+                attribute: Object.fromEntries(Object.entries(results.attribute).map(([k, v]) => [k, Array.from(v)]))
             },
             confidence
         };
